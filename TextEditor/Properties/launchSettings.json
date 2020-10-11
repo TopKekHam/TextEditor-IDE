@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TextEditor": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
