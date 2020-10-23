@@ -50,6 +50,7 @@ namespace R
 
             mesh.index_buffer = GFX.CreateBuffer();
             GFX.BufferUints(mesh.index_buffer, ram_mesh.indices, BufferType.INDEX);
+            GFX.BufferMesh(ref mesh);
 
             return mesh;
         }
@@ -179,7 +180,9 @@ namespace R
             
             quad.format = format;
             quad.indices_count = 6;
-            
+
+            GFX.BufferMesh(ref quad);
+
             return quad;
         }
 

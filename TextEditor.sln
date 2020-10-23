@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TextEditor", "TextEditor\Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Engine", "Engine\Engine.csproj", "{DA51103E-2042-42C9-8358-976EB7F25A1F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OOPIsShit", "OOPIsShit\OOPIsShit.csproj", "{9C45C265-69F9-44DC-8C20-1EABFA9D0392}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{DA51103E-2042-42C9-8358-976EB7F25A1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DA51103E-2042-42C9-8358-976EB7F25A1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DA51103E-2042-42C9-8358-976EB7F25A1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C45C265-69F9-44DC-8C20-1EABFA9D0392}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C45C265-69F9-44DC-8C20-1EABFA9D0392}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C45C265-69F9-44DC-8C20-1EABFA9D0392}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C45C265-69F9-44DC-8C20-1EABFA9D0392}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

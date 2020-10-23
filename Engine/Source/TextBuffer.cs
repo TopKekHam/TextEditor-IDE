@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace R
 {
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct Vector2I
     {
         public int x, y;

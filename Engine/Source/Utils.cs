@@ -1,9 +1,6 @@
-﻿using Microsoft.VisualBasic.CompilerServices;
-using System;
-using System.Collections.Generic;
-using System.Dynamic;
+﻿using System;
 using System.Numerics;
-using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace R
@@ -46,20 +43,6 @@ namespace R
             return Encoding.UTF8.GetString(bytes);
         }
 
-        public static byte[] ToCStr(string str)
-        {
-            byte[] s_str = new byte[str.Length + 1];
-
-            for (int i = 0; i < str.Length; i++)
-            {
-                s_str[i] = (byte)str[i];
-            }
-
-            s_str[str.Length] = 0;
-
-            return s_str;
-        }
-
         public static void PrintMat4(Matrix4x4 mat4)
         {
 
@@ -85,14 +68,62 @@ namespace R
         public static int DigitNumber(this int num)
         {
             int digits = 1;
-            
-            while(num > 10)
+
+            while (num > 10)
             {
                 num /= 10;
                 digits++;
             }
 
             return digits;
+        }
+
+        public static string Stringify(this object obj)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            Type type = obj.GetType();
+
+            var fields = type.GetFields();
+
+            foreach (var field in fields)
+            {
+                if (field.FieldType.IsValueType)
+                {
+                    builder.Append(field.Name);
+                    builder.Append(" = ");
+                    builder.Append(field.GetValue(obj));
+                    builder.Append('\n');
+                }
+                else
+                {
+                    builder.Append(field.Name);
+                    var value = field.GetValue(obj);
+
+                    if (value == null)
+                    {
+                        builder.Append(" = null\n");
+                    }
+                    else
+                    {
+                        builder.Append(" = {\n");
+                        builder.Append(Stringify(value));
+                        builder.Append("}\n");
+                    }
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        public unsafe static string ToString(this IntPtr char_str)
+        {
+            return Marshal.PtrToStringAnsi(char_str);
+        }
+
+        public static unsafe byte* ToCStr(this string str)
+        {
+            return (byte*)Marshal.StringToHGlobalAnsi(str).ToPointer();
         }
 
     }
@@ -108,41 +139,40 @@ namespace R
             set { data[index] = value; }
         }
 
-        public static ArrayList<T> AddItem(ArrayList<T> list, T item)
-        {
-            if (list.count == list.data.Length)
-            {
-                var temp = list.data;
-                list.data = new T[list.data.Length * 2];
-                Array.Copy(temp, list.data, temp.Length);
-            }
-
-            list.data[list.count] = item;
-            list.count += 1;
-
-            return list;
-        }
-
-        public static ArrayList<T> Create(int length = 32)
+        public ArrayList(int length = 32)
         {
             if (length <= 0) throw new Exception("you are trying to create list with 0 or less elements.");
 
-            ArrayList<T> list = new ArrayList<T>();
-            list.count = 0;
-            list.data = new T[length];
-
-            return list;
+            count = 0;
+            data = new T[length];
         }
-    
-        public static ArrayList<T> RemoveItem(ArrayList<T> list, int index)
+
+        public void AddItem(T item)
         {
+            if(count == data.Length)
+            {
+                var temp = data;
+                data = new T[data.Length * 2];
+                Array.Copy(temp, data, temp.Length);
+            }
 
-            if (list.count >= index || 0 < index) throw new Exception($"you are trying to remove non-existing element(index={index}, count={list.count})");
+            data[count] = item;
+            count += 1;
+        }
 
-            list.data[index] = list.data[list.count - 1];
-            list.count -= 1;
+        public void RemoveItem(int index)
+        {
+            if (count >= index || 0 < index) throw new Exception($"you are trying to remove non-existing element(index={index}, count={count})");
 
-            return list;
+            data[index] = data[count - 1];
+            count -= 1;
+        }
+
+        public T[] ToArray()
+        {
+            var arr = new T[count];
+            Array.Copy(data, arr, count);
+            return arr;
         }
     }
 
@@ -159,7 +189,7 @@ namespace R
             PackedArrayList list = new PackedArrayList();
             list.data = Engine.Malloc(_size);
             list.size = _size;
-            list.item_offsets = ArrayList<int>.Create();
+            list.item_offsets = new ArrayList<int>();
             list.next_offset = 0;
             return list;
         }
@@ -171,7 +201,7 @@ namespace R
 
         public static void AddItem<T>(PackedArrayList list, void* data, int size) where T : unmanaged
         {
-            if(list.next_offset + size > list.size)
+            if (list.next_offset + size > list.size)
             {
                 byte* temp = list.data;
                 list.data = Engine.Malloc(list.size * 2);
@@ -179,10 +209,10 @@ namespace R
                 list.size *= 2;
                 Engine.Free(temp);
             }
-            
+
             Engine.Memcopy(list.data + list.next_offset, data, size);
 
-            list.item_offsets = ArrayList<int>.AddItem(list.item_offsets, list.next_offset);
+            list.item_offsets.AddItem(list.next_offset);
             list.next_offset += size;
         }
 

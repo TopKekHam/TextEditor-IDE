@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using R;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
 public class SDL
 {
-    const string sdl_dll = "SDL2.dll";
+    const string dll_path = "Dlls/SDL2.dll";
 
     #region UTF8 Marshaling
 
@@ -56,6 +56,7 @@ public class SDL
         }
         return buffer;
     }
+
     internal static unsafe byte* Utf8EncodeNullable(string str)
     {
         if (str == null)
@@ -122,15 +123,17 @@ public class SDL
 
     #endregion
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_free", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_free", CallingConvention = CallingConvention.Cdecl)]
     internal static extern void Free(IntPtr memblock);
 
+    [DllImport(dll_path, EntryPoint = "SDL_GetError", CallingConvention = CallingConvention.Cdecl)]
+    public unsafe static extern IntPtr GetError();
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_Init", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_Init", CallingConvention = CallingConvention.Cdecl)]
     public static extern int Init(SDL_INIT_FLAGS prms);
 
     /* IntPtr refers to an SDL_Window* */
-    [DllImport(sdl_dll, EntryPoint = "SDL_CreateWindow", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_CreateWindow", CallingConvention = CallingConvention.Cdecl)]
     private static extern unsafe IntPtr INTERNAL_SDL_CreateWindow( byte* title, int x, int y, int w, int h, SDL_WINDOW_FLAGS flags );
 
     public static unsafe IntPtr CreateWindow( string title, int x, int y, int w, int h, SDL_WINDOW_FLAGS flags )
@@ -140,34 +143,34 @@ public class SDL
         return INTERNAL_SDL_CreateWindow( Utf8EncodeNullable(title, utf8Title, utf8TitleBufSize), x, y, w, h, flags );
     }
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_DestroyWindow", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_DestroyWindow", CallingConvention = CallingConvention.Cdecl)]
     public static extern void DestroyWindow(IntPtr window);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GL_CreateContext", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GL_CreateContext", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr GL_CreateContext(IntPtr window);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GetTicks")]
+    [DllImport(dll_path, EntryPoint = "SDL_GetTicks")]
     public static extern uint GetTicks();
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GL_DeleteContext", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GL_DeleteContext", CallingConvention = CallingConvention.Cdecl)]
     public static extern void GL_DeleteContext(IntPtr gl_context);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_Quit", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_Quit", CallingConvention = CallingConvention.Cdecl)]
     public static extern void Quit();
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GetKeyboardState", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GetKeyboardState", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern IntPtr GetKeyboardState(out int numkeys);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_PollEvent", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_PollEvent", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int PollEvent(out SDL_Event envt);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GL_SwapWindow", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GL_SwapWindow", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int GL_SwapWindow(IntPtr gl_context);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GetMouseState", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GetMouseState", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern uint GetMouseState(out int x, out int y);
 
-    [DllImport(sdl_dll, EntryPoint = "SDL_GL_SetAttribute", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, EntryPoint = "SDL_GL_SetAttribute", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int GL_SetAttribute(SDL_GLattr attr, int value);
 
     public static int GL_SetAttribute(SDL_GLattr attr, SDL_GLprofile profile )
@@ -175,8 +178,7 @@ public class SDL
         return GL_SetAttribute(attr, (int)profile);
     }
 
-
-    [DllImport(sdl_dll, CharSet = CharSet.Auto, EntryPoint = "SDL_GL_GetProcAddress", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_GL_GetProcAddress", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern IntPtr GL_GetProcAddress(IntPtr proc_name);
 
     public static unsafe T GL_GetProcAddress<T>(string proc) where T : Delegate
@@ -187,17 +189,51 @@ public class SDL
         return (T)Marshal.GetDelegateForFunctionPointer(delegatePtr, typeof(T));
     }
 
-    [DllImport(sdl_dll, CharSet = CharSet.Auto, EntryPoint = "SDL_ShowCursor", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_ShowCursor", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int ShowCursor(int enabled);
 
-    [DllImport(sdl_dll, CharSet = CharSet.Auto, EntryPoint = "SDL_Delay", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_Delay", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern void Delay(uint ms);
 
-    [DllImport(sdl_dll, CharSet = CharSet.Auto, EntryPoint = "SDL_StartTextInput", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_StartTextInput", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern void StartTextInput();
 
-    [DllImport(sdl_dll, CharSet = CharSet.Auto, EntryPoint = "SDL_StopTextInput", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_StopTextInput", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern void StopTextInput();
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_SetWindowSize", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern void SetWindowSize(IntPtr window, int w, int h);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_GetNumAudioDrivers", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern int GetNumAudioDrivers();
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_GetAudioDriver", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern void* GetAudioDriver(int index);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_AudioInit", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern int AudioInit(void* driver_name);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_AudioQuit", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern void AudioQuit();
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_OpenAudioDevice", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern uint OpenAudioDevice(char* device, int iscapture, SDL_AudioSpec* desired, SDL_AudioSpec* obtained, int allowed_changes);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_PauseAudioDevice", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern void PauseAudioDevice(uint dev, int pause_on);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_RWFromFile", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern IntPtr RWFromFile(byte* file, byte* mode);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_LoadWAV_RW", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern SDL_AudioSpec* LoadWAV_RW(IntPtr src, int freesrc, SDL_AudioSpec* spec, byte** audio_buf, uint* audio_len);
+
+    public static unsafe SDL_AudioSpec* LoadWAV(string path, SDL_AudioSpec* spec, byte** audio_buf, uint* audio_len)
+    {
+        var src = path.ToCStr();
+        var rw = RWFromFile(src, "rb".ToCStr());
+        return LoadWAV_RW(rw, 0, spec, audio_buf, audio_len);
+    }
 
 }
 
@@ -433,6 +469,80 @@ public struct SDL_Keysym
     public int sym;            /**< SDL virtual key code - see ::SDL_Keycode for details */
     public ushort mod;                 /**< current key modifiers */
     public uint unused;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct SDL_Surface
+{
+    uint flags;               /**< Read-only */
+    void* format;    /**< Read-only */
+    int w, h;                   /**< Read-only */
+    int pitch;                  /**< Read-only */
+    void* pixels;               /**< Read-write */
+
+    /** Application data associated with the surface */
+    void* userdata;             /**< Read-write */
+
+    /** information needed for surfaces requiring locks */
+    int locked;                 /**< Read-only */
+    void* lock_data;            /**< Read-only */
+
+    /** clipping information */
+    SDL_Rect clip_rect;         /**< Read-only */
+
+    /** info for fast blit mapping to other surfaces */
+    void* map;    /**< Private */
+
+    /** Reference count -- used when freeing surface */
+    int refcount;               /**< Read-mostly */
+}
+
+public struct SDL_Color
+{
+    public byte r, g, b, a; 
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct SDL_Rect
+{
+    public int x, y;
+    public int w, h;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct SDL_AudioSpec
+{
+    public int freq;                   /**< DSP frequency -- samples per second */
+    public SDL_Audio_Format format;     /**< Audio data format */
+    public byte channels;             /**< Number of channels: 1 mono, 2 stereo */
+    public byte silence;              /**< Audio buffer silence value (calculated) */
+    public ushort samples;             /**< Audio buffer size in sample FRAMES (total samples divided by channel count) */
+    public ushort padding;             /**< Necessary for some compile environments */
+    public uint size;                /**< Audio buffer size in bytes (calculated) */
+    public IntPtr callback; /** this is |SDL_AudioCallback| < Callback that feeds the audio device (NULL to use SDL_QueueAudio()). */
+    public void* userdata;             /**< Userdata passed to callback (ignored for NULL callbacks). */
+}
+
+public unsafe delegate void SDL_AudioCallback(void* userdata, byte* stream, int len);
+
+public enum SDL_Audio_Format : ushort
+{
+    AUDIO_U8        = 0x0008,  /**< Unsigned 8-bit samples */
+    AUDIO_S8        = 0x8008,  /**< Signed 8-bit samples */
+    AUDIO_U16LSB    = 0x0010,  /**< Unsigned 16-bit samples */
+    AUDIO_S16LSB    = 0x8010,  /**< Signed 16-bit samples */
+    AUDIO_U16MSB    = 0x1010,  /**< As above, but big-endian byte order */
+    AUDIO_S16MSB    = 0x9010,  /**< As above, but big-endian byte order */
+    AUDIO_U16       = AUDIO_U16LSB,
+    AUDIO_S16       = AUDIO_S16LSB,
+                      
+    AUDIO_S32LSB    = 0x8020, /**< 32-bit integer samples */
+    AUDIO_S32MSB    = 0x9020,  /**< As above, but big-endian byte order */
+    AUDIO_S32       = AUDIO_S32LSB,
+                      
+    AUDIO_F32LSB    = 0x8120,  /**< 32-bit floating point samples */
+    AUDIO_F32MSB    = 0x9120,  /**< As above, but big-endian byte order */
+    AUDIO_F32       = AUDIO_F32LSB
 }
 
 public enum SDL_Scancode 

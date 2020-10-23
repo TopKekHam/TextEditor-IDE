@@ -1,9 +1,6 @@
-﻿
-using System;
+﻿using System;
 using System.IO;
-using System.Net;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace R
@@ -54,22 +51,27 @@ namespace R
         public static void Init(int width = 800, int height = 600)
         {
 
-            if (SDL.Init(SDL_INIT_FLAGS.EVERYTHING) > 0)
+            if (SDL.Init(SDL_INIT_FLAGS.VIDEO | SDL_INIT_FLAGS.EVENTS | SDL_INIT_FLAGS.AUDIO) > 0)
             {
                 Console.WriteLine("something bad happend");
             }
 
-            window = SDL.CreateWindow("game engine", 200, 100, width, height, SDL_WINDOW_FLAGS.OPENGL | SDL_WINDOW_FLAGS.RESIZABLE);
+            Opengl.SetGLAtrribs();
 
+            window = SDL.CreateWindow("game engine", 200, 100, width, height, SDL_WINDOW_FLAGS.OPENGL | SDL_WINDOW_FLAGS.RESIZABLE);
             window_size = new Vector2(width, height);
             opengl_context = SDL.GL_CreateContext(window);
+            Opengl.LoadGLProcs();
 
-            Opengl.Init();
             Console.WriteLine($"Max texture size: {Opengl.MAX_TEXTURE_SIZE}");
             GFX.SetViewport((uint)window_size.X, (uint)window_size.Y);
 
             prev_ticks = DateTime.UtcNow.Ticks;
             keyboard_state = new byte[512];
+
+
+            //Audio.Init(); 
+            AssetsLoader.Init();
 
             SDL.StartTextInput();
         }
@@ -249,6 +251,13 @@ namespace R
         public static void Free(void* ptr)
         {
             Marshal.FreeHGlobal((IntPtr)ptr);
+        }
+
+        public static void SetWindowSize(int width, int height)
+        {
+            SDL.SetWindowSize(window, width, height);
+            GFX.SetViewport((uint)width, (uint)height);
+            window_size = new Vector2(width, height);
         }
 
         public static void LogError(string text)

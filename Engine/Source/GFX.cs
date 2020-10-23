@@ -1,5 +1,4 @@
-﻿
-using HI;
+﻿using HI;
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -12,6 +11,7 @@ namespace R
     [StructLayout(LayoutKind.Sequential)]
     public struct Mesh
     {
+        public uint array_buffer;
         public uint vertex_buffer;
         public uint index_buffer;
         public VertexFormat format;
@@ -42,6 +42,7 @@ namespace R
         POSITION = 1,
         TEX_COORD = 2,
         NORMAL = 4,
+        COLOR = 8,
     }
 
     public enum VertexComponentPosition : uint
@@ -49,6 +50,7 @@ namespace R
         POSITION = 0,
         TEXCOORD = 1,
         NORMAL = 2,
+        COLOR = 3,
     }
 
     public enum TextureType
@@ -89,63 +91,64 @@ namespace R
             glClearColor(color.X, color.Y, color.Z, color.W);
         }
 
-        public static void CleatStencil()
-        {
-            
-        }
-
         public static void ClearColorBuffer()
         {
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_Enum.COLOR_BUFFER_BIT);
         }
 
         public static void ClearDepth()
         {
-            glClear(GL_DEPTH_BUFFER_BIT);
+            glClear(GL_Enum.DEPTH_BUFFER_BIT);
         }
 
         public static void ClearStencil()
         {
-            glClear(GL_STENCIL_BUFFER_BIT);
+            glClear(GL_Enum.STENCIL_BUFFER_BIT);
+        }
+
+        public static void StencilClearValue(int value)
+        {
+            glClearStencil(value);
         }
 
         public static void ClearAll()
         {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+            glClear(GL_Enum.COLOR_BUFFER_BIT | GL_Enum.DEPTH_BUFFER_BIT | GL_Enum.STENCIL_BUFFER_BIT);
         }
 
         public static void EnableDepthTest()
         {
-            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_Enum.DEPTH_TEST);
         }
 
         public static void DisableDepthTest()
         {
-            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_Enum.DEPTH_TEST);
         }
 
         public static void EnableStencilTest()
         {
-            glEnable(GL_STENCIL_TEST);
+            glEnable(GL_Enum.STENCIL_TEST);
         }
 
         public static void DisableStencilTest()
         {
-            glDisable(GL_STENCIL_TEST);
+            glDisable(GL_Enum.STENCIL_TEST);
         }
 
         public static void StencilWrite()
         {
-            glStencilMask(0xFF); // Writing = ON
-            glStencilFunc(GL_ALWAYS, 1, 0xFF); // Always "add" to frame
-            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace on success
+            glStencilMask(int.MaxValue); // Writing = ON
+            glStencilFunc(GL_Enum.ALWAYS, 1, int.MaxValue); // Always "add" to frame
+            glStencilOp(GL_Enum.REPLACE, GL_Enum.REPLACE, GL_Enum.REPLACE); // Replace on success
             //Anything rendered here becomes "cut" frame.
         }
 
-        public static void StencilCull()
+        public static void StencilCull(bool inside)
         {
-            glStencilMask(0x00); // Writing = OFF
-            glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // Anything that wasn't defined above will not be rendered.
+            glStencilMask(0); // Writing = OFF
+            glStencilFunc(inside ? GL_Enum.NOTEQUAL : GL_Enum.EQUAL, 1, int.MaxValue); // Anything that wasn't defined above will not be rendered.
+            glStencilOp(GL_Enum.KEEP, GL_Enum.KEEP, GL_Enum.KEEP);
             //Anything rendered here will be cut if goes beyond frame defined before.
         }
 
@@ -160,11 +163,11 @@ namespace R
         {
             if (type == BufferType.VERTEX)
             {
-                glBindBuffer(GL_ARRAY_BUFFER, (uint)buffer);
+                glBindBuffer(GL_Enum.ARRAY_BUFFER, (uint)buffer);
             }
             else if (type == BufferType.INDEX)
             {
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (uint)buffer);
+                glBindBuffer(GL_Enum.ELEMENT_ARRAY_BUFFER, (uint)buffer);
             }
         }
 
@@ -190,11 +193,11 @@ namespace R
 
             if (type == BufferType.VERTEX)
             {
-                glBufferData(GL_ARRAY_BUFFER, length, data, GL_STATIC_DRAW);
+                glBufferData(GL_Enum.ARRAY_BUFFER, length, data, GL_Enum.STATIC_DRAW);
             }
             else if (type == BufferType.INDEX)
             {
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, length, data, GL_STATIC_DRAW);
+                glBufferData(GL_Enum.ELEMENT_ARRAY_BUFFER, length, data, GL_Enum.STATIC_DRAW);
             }
 
         }
@@ -204,30 +207,41 @@ namespace R
             glDeleteBuffers(1, &buffer);
         }
 
-        public static void DeleteMesh(Mesh mesh)
-        {
-            DeleteBuffer(mesh.vertex_buffer);
-            DeleteBuffer(mesh.index_buffer);
-        }
-
         public static void BindShader(uint shader)
         {
             glUseProgram((uint)shader);
         }
 
+        public static void BufferMesh(ref Mesh mesh)
+        {
+            uint array_buffer;
+            glGenVertexArrays(1, &array_buffer);
+            glBindVertexArray(array_buffer);
+
+            mesh.array_buffer = array_buffer;
+            BindBuffer(mesh.vertex_buffer, BufferType.VERTEX);
+            SetupVertexAttrib(mesh.format);
+            BindBuffer(mesh.index_buffer, BufferType.INDEX);
+        }
+
         public static void BindMesh(Mesh mesh)
         {
-            BindBuffer(mesh.vertex_buffer, BufferType.VERTEX);
-            BindBuffer(mesh.index_buffer, BufferType.INDEX);
-            SetupVertexAttrib(mesh.format);
+            glBindVertexArray(mesh.array_buffer);
+        }
+
+        public static void DeleteMesh(Mesh mesh)
+        {
+            glDeleteBuffers(1, &mesh.vertex_buffer);
+            glDeleteBuffers(1, &mesh.index_buffer);
+            glDeleteVertexArrays(1, &mesh.array_buffer);
         }
 
         public static void BindTexture(uint buffer)
         {
-            glBindTexture(GL_TEXTURE_2D, buffer);
+            glBindTexture(GL_Enum.TEXTURE_2D, buffer);
         }
 
-        public uint BufferTexture(byte[] data, int width, int height, TextureType type)
+        public static uint BufferTexture(byte[] data, int width, int height, TextureType type)
         {
             unsafe
             {
@@ -238,25 +252,39 @@ namespace R
             }
         }
 
-        public static uint BufferTexture(void* data, int width, int height, TextureType type)
+        public static uint CreateTexture()
+        {
+            uint buffer;
+            glGenTextures(1, &buffer);
+            return buffer;
+        }
+
+        public static uint BufferTexture(void* data, int width, int height, TextureType type, int texture_buffer = -1)
         {
             uint buffer;
 
-            glGenTextures(1, &buffer);
-            glBindTexture(GL_TEXTURE_2D, (uint)buffer);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-
-            if (type == TextureType.BIT_8)
+            if (texture_buffer == -1)
             {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+                glGenTextures(1, &buffer);
+                glBindTexture(GL_Enum.TEXTURE_2D, (uint)buffer);
             }
             else
             {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+                buffer = (uint)texture_buffer;
+            }
+
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MIN_FILTER, GL_Enum.NEAREST);
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MAG_FILTER, GL_Enum.NEAREST);
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_WRAP_S, GL_Enum.MIRRORED_REPEAT);
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_WRAP_T, GL_Enum.MIRRORED_REPEAT);
+
+            if (type == TextureType.BIT_8)
+            {
+                glTexImage2D(GL_Enum.TEXTURE_2D, 0, GL_Enum.ALPHA, width, height, 0, GL_Enum.ALPHA, GL_Enum.UNSIGNED_BYTE, data);
+            }
+            else
+            {
+                glTexImage2D(GL_Enum.TEXTURE_2D, 0, GL_Enum.RGBA, width, height, 0, GL_Enum.BGRA, GL_Enum.UNSIGNED_BYTE, data);
             }
 
             return buffer;
@@ -264,7 +292,7 @@ namespace R
 
         public static void ActivateTexture(int index)
         {
-            glActiveTexture(GL_TEXTURE0 + (uint)index);
+            glActiveTexture(GL_Enum.TEXTURE0 + (uint)index);
         }
 
         public static void SetViewport(uint width, uint height)
@@ -278,10 +306,10 @@ namespace R
         {
             unsafe
             {
-                int compiled = 0;
-                glGetShaderiv(shader, GL_COMPILE_STATUS, ref compiled);
+                GL_Enum compiled = 0;
+                glGetShaderiv(shader, GL_Enum.COMPILE_STATUS, ref compiled);
 
-                if (compiled != GL_TRUE)
+                if (compiled != GL_Enum.TRUE)
                 {
                     int log_length = 0;
 
@@ -294,13 +322,7 @@ namespace R
             }
         }
 
-        public static void FreeMesh(Mesh text_mesh)
-        {
-            glDeleteBuffers(1, &text_mesh.vertex_buffer);
-            glDeleteBuffers(1, &text_mesh.index_buffer);
-        }
-
-        static uint CompileShader(string src, uint type)
+        static uint CompileShader(string src, GL_Enum type)
         {
             uint shader = glCreateShader(type);
 
@@ -320,8 +342,8 @@ namespace R
         {
             unsafe
             {
-                uint vert_shader = CompileShader(vert_src, GL_VERTEX_SHADER);
-                uint frag_shader = CompileShader(frag_src, GL_FRAGMENT_SHADER);
+                uint vert_shader = CompileShader(vert_src, GL_Enum.VERTEX_SHADER);
+                uint frag_shader = CompileShader(frag_src, GL_Enum.FRAGMENT_SHADER);
 
                 uint program = glCreateProgram();
 
@@ -352,6 +374,11 @@ namespace R
                 stride += 12;
             }
 
+            if(format.HasFlag(VertexFormat.COLOR))
+            {
+                stride += 16;
+            }
+
             return stride;
         }
 
@@ -363,22 +390,29 @@ namespace R
             if (format.HasFlag(VertexFormat.POSITION))
             {
                 glEnableVertexAttribArray((uint)VertexComponentPosition.POSITION);
-                glVertexAttribPointer((uint)VertexComponentPosition.POSITION, 3, GL_FLOAT, 0, stride, (void*)0);
+                glVertexAttribPointer((uint)VertexComponentPosition.POSITION, 3, GL_Enum.FLOAT, 0, stride, (void*)0);
                 next_ptr += 12;
             }
 
             if (format.HasFlag(VertexFormat.TEX_COORD))
             {
                 glEnableVertexAttribArray((uint)VertexComponentPosition.TEXCOORD);
-                glVertexAttribPointer((uint)VertexComponentPosition.TEXCOORD, 2, GL_FLOAT, 0, stride, (void*)(next_ptr));
+                glVertexAttribPointer((uint)VertexComponentPosition.TEXCOORD, 2, GL_Enum.FLOAT, 0, stride, (void*)(next_ptr));
                 next_ptr += 8;
             }
 
             if (format.HasFlag(VertexFormat.NORMAL))
             {
                 glEnableVertexAttribArray((uint)VertexComponentPosition.NORMAL);
-                glVertexAttribPointer((uint)VertexComponentPosition.NORMAL, 2, GL_FLOAT, 0, stride, (void*)(next_ptr));
+                glVertexAttribPointer((uint)VertexComponentPosition.NORMAL, 2, GL_Enum.FLOAT, 0, stride, (void*)(next_ptr));
                 next_ptr += 12;
+            }
+
+            if (format.HasFlag(VertexFormat.COLOR))
+            {
+                glEnableVertexAttribArray((uint)VertexComponentPosition.COLOR);
+                glVertexAttribPointer((uint)VertexComponentPosition.COLOR, 4, GL_Enum.FLOAT, 0, stride, (void*)(next_ptr));
+                next_ptr += 16;
             }
 
         }
@@ -405,18 +439,18 @@ namespace R
                     switch (unis[i].type)
                     {
                         case UniformType.Vector2:
-                            SetUniformV2(GFX.GetUniformLocation(material.shader, unis[i].name), unis[i].vec2);
+                            SetUniformV2(GetUniformLocation(material.shader, unis[i].name), unis[i].vec2);
                             break;
                         case UniformType.Vector3:
-                            SetUniformV3(GFX.GetUniformLocation(material.shader, unis[i].name), unis[i].vec3);
+                            SetUniformV3(GetUniformLocation(material.shader, unis[i].name), unis[i].vec3);
                             break;
                         case UniformType.Vector4:
-                            SetUniformV4(GFX.GetUniformLocation(material.shader, unis[i].name), unis[i].vec4);
+                            SetUniformV4(GetUniformLocation(material.shader, unis[i].name), unis[i].vec4);
                             break;
                         case UniformType.Texture:
                             ActivateTexture(tex_slot);
                             BindTexture(unis[i].texture);
-                            SetUniformTexture(GFX.GetUniformLocation(material.shader, unis[i].name), tex_slot);
+                            SetUniformTexture(GetUniformLocation(material.shader, unis[i].name), tex_slot);
                             tex_slot++;
                             break;
                     }
@@ -426,28 +460,18 @@ namespace R
 
         public static void Draw(uint indices_count)
         {
-            glDrawElements(GL_TRIANGLES, indices_count, GL_UNSIGNED_INT, (void*)0);
+            glDrawElements(GL_Enum.TRIANGLES, indices_count, GL_Enum.UNSIGNED_INT, (void*)0);
         }
 
         public static void DrawLine(uint indices_count)
         {
-
-            glDrawElements(GL_LINES, indices_count, GL_UNSIGNED_INT, (void*)0);
-
+            glDrawElements(GL_Enum.LINES, indices_count, GL_Enum.UNSIGNED_INT, (void*)0);
         }
 
         public static int GetUniformLocation(uint shader, string uniform_name)
         {
-
-            //var bytes = Utils.ToUtf8(uniform_name);
-            var c_str = ToCStr(uniform_name);
-
-            fixed (byte* ptr = c_str)
-            {
-                var location = glGetUniformLocation(shader, ptr);
-                return location;
-            }
-
+            var location = glGetUniformLocation(shader, uniform_name.ToCStr());
+            return location;
         }
 
         public static void SetBlendMode(BlendFunction source, BlendFunction destination)
@@ -457,7 +481,7 @@ namespace R
 
         public static void SetBlendMode(BlendMode mode)
         {
-            glEnable(GL_BLEND);
+            glEnable(GL_Enum.BLEND);
 
             switch (mode)
             {

@@ -1,0 +1,9 @@
+﻿texture_path Assets/Fonts/font_8x8.png
+
+// base line offsets.
+
+g -2
+p -2
+q -2
+y -2
+, -1

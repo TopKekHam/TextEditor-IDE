@@ -25,7 +25,7 @@ namespace R
 
     public struct UIStyle
     {
-        public FontAscii text_font;
+        public Ascii_Font text_font;
         public Vector4 text_color;
         public int text_size;
         public Vector4 primary_color;
@@ -246,7 +246,7 @@ namespace R
         public static void TextCursor(Vector3 position, string text, int char_idx)
         {
             Transform tran = Transform.Zero;
-            tran.position = position + Fonts.GetCharPosition(state.style.text_font, text, state.style.text_size, char_idx);
+            tran.position = position + Ascii_Font_Utils.GetCharPosition(state.style.text_font, text, state.style.text_size, char_idx);
             tran.position.Y += -state.style.text_size + 2;
 
             Renderer.DrawTextAscii(tran, state.style.text_font, "_", state.style.text_color, state.style.text_size);

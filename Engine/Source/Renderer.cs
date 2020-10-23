@@ -38,6 +38,7 @@ namespace R
         static uint color_shader;
         static uint image_shader;
         static uint tinted_image_shader;
+        static uint ascii_text_image_shader;
         static uint quad_vert_buffer;
         static uint quad_ind_buffer;
 
@@ -126,10 +127,9 @@ namespace R
                 format = VertexFormat.POSITION | VertexFormat.TEX_COORD
             };
 
-            render_item_buffer = Create();
+            render_item_buffer = new ArrayList<RenderItem>();
 
             GFX.SetBlendMode(BlendMode.Alpha);
-            GFX.EnableDepthTest();
             SetCameraSize(1, 1);
         }
 
@@ -190,7 +190,7 @@ namespace R
 
             DrawMesh(transform, mat, mesh);
 
-            FreeMesh(mesh);
+            DeleteMesh(mesh);
         }
 
         public static void DrawQuad(Transform transform, Vector2 size, uint texture)
@@ -208,7 +208,7 @@ namespace R
 
             DrawMesh(transform, mat, mesh);
 
-            FreeMesh(mesh);
+            DeleteMesh(mesh);
         }
 
         public static void DrawQuad(Transform transform, Vector2 size, Material mat)
@@ -218,7 +218,7 @@ namespace R
 
             DrawMesh(transform, mat, mesh);
 
-            FreeMesh(mesh);
+            DeleteMesh(mesh);
         }
 
         public static void DrawMesh(Transform transform, Material material, Mesh mesh)
@@ -259,30 +259,42 @@ namespace R
             return mat;
         }
 
-        public static void DrawTextAscii(Transform transform, FontAscii font, string text, Vector4 color, float size)
+        public static void DrawTextAscii(Transform transform, Ascii_Font font, string text, Vector4 color, float size)
         {
-            var text_mesh = Fonts.GenerateTextMesh(font, text, size);
+            var text_mesh = Ascii_Font_Utils.GenerateTextMesh(font, text, size, BroadcastColor(color, text.Length));
 
             Material mat = new Material();
-            mat.shader = tinted_image_shader;
+            mat.shader = Ascii_Font_Utils.shader;
             mat.uniform_params = new UniformParam[] {
                 new UniformParam { name = "tex_0", texture = font.texture, type = UniformType.Texture },
-                new UniformParam { name = "tint", vec4 = color, type = UniformType.Vector4}
+                new UniformParam { name = "tint", vec4 = Vector4.One, type = UniformType.Vector4}
             };
 
             DrawMesh(transform, mat, text_mesh);
 
-            FreeMesh(text_mesh);
+            DeleteMesh(text_mesh);
+        }
+
+        public static Vector4[] BroadcastColor(Vector4 color, int length)
+        {
+            Vector4[] char_colors = new Vector4[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                char_colors[i] = color;
+            }
+
+            return char_colors;
         }
 
         public static void AddRenderItem(RenderItem item)
         {
-            render_item_buffer = AddItem(render_item_buffer, item);
+            render_item_buffer.AddItem(item);
         }
 
         public static void AddQuadRenderItem(Transform transform, Vector2 size, Material material)
         {
-            render_item_buffer = AddItem(render_item_buffer, new RenderItem()
+            render_item_buffer.AddItem(new RenderItem()
             {
                 mesh = MeshGenerator.GenerateQuad(size, VertexFormat.TEX_COORD | VertexFormat.TEX_COORD),
                 free_mesh= true,
@@ -291,11 +303,11 @@ namespace R
             });
         }
 
-        public static void AddTextAsciiRenderItem(Transform transform, FontAscii font, string text, Vector4 color, float size)
+        public static void AddTextAsciiRenderItem(Transform transform, Ascii_Font font, string text, Vector4 color, float size)
         {
-            render_item_buffer = AddItem(render_item_buffer, new RenderItem()
+            render_item_buffer.AddItem(new RenderItem()
             {
-                mesh = Fonts.GenerateTextMesh(font, text, size),
+                mesh = Ascii_Font_Utils.GenerateTextMesh(font, text, size, BroadcastColor(color, text.Length)),
                 free_mesh = true,
                 material = CreateColorMaterail(color),
                 transform = transform
@@ -311,7 +323,7 @@ namespace R
 
                 if(item.free_mesh)
                 {
-                    GFX.FreeMesh(item.mesh);
+                    DeleteMesh(item.mesh);
                 }
             }
 
