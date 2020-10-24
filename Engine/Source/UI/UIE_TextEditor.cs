@@ -55,49 +55,106 @@ namespace R
                 int first_line = top_line;
                 var pos = rect.CalcPosition(canvas_size);
 
-                Transform tran = Transform.Zero;
-                tran.position = pos;
-                tran.position.X += pl + (rect.width / -2);
-                tran.position.Y = pos.Y + (rect.height / 2);
+                //Transform tran = Transform.Zero;
+                //tran.position = pos;
+                //tran.position.X += pl + (rect.width / -2);
+                //tran.position.Y = pos.Y + (rect.height / 2);
 
-                // draw line numbers
+                //// draw line numbers
 
-                for (int i = 1; i <= number_of_line_to_render; i++)
+                //for (int i = 1; i <= number_of_line_to_render; i++)
+                //{
+                //    Renderer.DrawTextAscii(tran, font, $"{first_line + i}", style.line_numbers_color, font_size);
+                //    tran.position.Y -= line_height;
+                //}
+
+                // write writing drawable area to stencil buffer 
                 {
-                    Renderer.DrawTextAscii(tran, font, $"{first_line + i}", style.line_numbers_color, font_size);
-                    tran.position.Y -= line_height;
-                }
-
-                //draw line indicator
-
-                float current_line_y = (Ascii_Font_Utils.GetLineHeight(font, font_size) * (cursor.y - top_line));
-
-                Transform line_indicator_tran = Transform.Zero;
-                line_indicator_tran.position.X += (line_number_padding / 2) + pos.Y;
-                line_indicator_tran.position.Y = (rect.height / 2) + pos.Y - (line_height / 2) - current_line_y;
-                Vector4 indicator_color = style.cursor_color;
-                indicator_color.W = 0.125f;
-                Renderer.DrawQuad(line_indicator_tran, new Vector2(rect.width - line_number_padding, line_height), indicator_color);
-
-                // draw file text
-
-                { // write writing drawable area to stencil buffer
                     GFX.EnableStencilTest();
                     GFX.ClearStencil();
 
-                    Transform tran_left_side = Transform.Zero;
+                    Transform stencil_tran = Transform.Zero;
 
-                    tran_left_side.position.X = pos.X + (line_number_padding / 2);
-                    tran_left_side.position.Y = pos.Y;
+                    stencil_tran.position.X = pos.X;
+                    stencil_tran.position.Y = pos.Y;
 
                     GFX.StencilWrite();
-                    Renderer.DrawQuad(tran_left_side, new Vector2(rect.width - line_number_padding, rect.height), Vector4.Zero);
+                    Renderer.DrawQuad(stencil_tran, new Vector2(rect.width, rect.height), Vector4.Zero);
+                    GFX.StencilCull(false);
                 }
 
-                tran.position.Y = pos.Y + (rect.height / 2);
-                tran.position.X += line_number_padding - x_padding;
 
-                GFX.StencilCull(false);
+                //draw line indicator
+                float current_line_y = (line_height * (cursor.y - top_line));
+
+                Transform line_indicator_tran = Transform.Zero;
+                line_indicator_tran.position.X = pos.X;
+                line_indicator_tran.position.Y = (rect.height / 2) + pos.Y - (line_height / 2) - current_line_y;
+                Vector4 indicator_color = style.cursor_color;
+                indicator_color.W = 0.125f;
+                var line_indicator_size = new Vector2(rect.width, line_height);
+                Renderer.DrawQuad(line_indicator_tran, line_indicator_size, indicator_color);
+
+
+                // draw buffer selection
+
+                if (text_buffer.selection_active)
+                {
+
+                    Vector2I ancor = text_buffer.selection_ancor;
+                    int start_line = Math.Min(ancor.y, cursor.y);
+                    int end_line = Math.Max(ancor.y, cursor.y);
+
+                    for (int i = start_line; i <= end_line; i++)
+                    {
+                        int start = 0;
+                        int end = text_buffer.lines[i].Length;
+
+                        if (i == ancor.y || i == cursor.y)
+                        {
+                            if (ancor.y == cursor.y)
+                            {
+                                start = Math.Min(ancor.x, cursor.x);
+                                end = Math.Max(ancor.x, cursor.x);
+                            }
+                            else if (ancor.y == i)
+                            {
+                                if (ancor.y > cursor.y)
+                                {
+                                    start = 0;
+                                    end = ancor.x;
+                                }
+                                else
+                                {
+                                    start = ancor.x;
+                                    end = text_buffer.lines[ancor.y].Length;
+                                }
+                            }
+                            else
+                            {
+                                if (ancor.y < cursor.y)
+                                {
+                                    start = 0;
+                                    end = cursor.x;
+                                }
+                                else
+                                {
+                                    start = cursor.x;
+                                    end = text_buffer.lines[cursor.y].Length;
+                                }
+                            }
+                        }
+
+                        DrawSelection(font, pos, i, start, end, new Vector4(0.6f, 0.6f, 1f, 0.25f));
+                    }
+                }
+
+                // draw file text
+                Transform tran = Transform.Zero;
+                tran.position = pos;
+                tran.position.Y = pos.Y + (rect.height / 2);
+                tran.position.X = pos.X + (rect.width / -2) - x_padding + pl;
+
                 // draw lines of text.
                 for (int i = 0; i < number_of_line_to_render; i++)
                 {
@@ -116,7 +173,6 @@ namespace R
 
                     tran.position.Y -= line_height;
                 }
-                GFX.DisableStencilTest();
 
                 // draw cursor
                 if (cursor_on)
@@ -132,7 +188,34 @@ namespace R
                     Renderer.DrawTextAscii(tran, font, "|", style.cursor_color, font_size);
                 }
 
+
+                GFX.DisableStencilTest();
+
+
             }
+        }
+
+        void DrawSelection(Ascii_Font font, Vector3 pos, int line, int start, int end, Vector4 color)
+        {
+            int font_size = font.glyph_size_in_pixels * font_scale;
+            float line_height = Ascii_Font_Utils.GetLineHeight(font, font_size);
+            float pl = font_size / font.glyph_size_in_pixels; //default padding left;
+
+            float sl_padding = Ascii_Font_Utils.GetTextWidth(font, text_buffer.lines[line], font_size, start);
+            float sl_width = Ascii_Font_Utils.GetTextWidth(font, text_buffer.lines[line], font_size, end - start, start);
+            
+            if(sl_width == 0)
+            {
+                sl_width = Ascii_Font_Utils.GetGlyphSize(font, font_size);
+            }
+
+            float sl_line_y = (line_height * (line - top_line));
+
+            Transform tran_selection = Transform.Zero;
+
+            tran_selection.position.X = pl + pos.X + (rect.width / -2.0f) + (sl_width / 2) + sl_padding - x_padding;
+            tran_selection.position.Y = pos.Y + (rect.height / 2) - (line_height / 2) - sl_line_y;
+            Renderer.DrawQuad(tran_selection, new Vector2(sl_width, line_height), color);
         }
 
         public void ResetCursorOn()
@@ -166,8 +249,8 @@ namespace R
                text_buffer.lines.Count > number_of_line_to_render)
             {
                 drawn_height += line_height;
-                
-                if(drawn_height < rect.height)
+
+                if (drawn_height < rect.height)
                 {
                     number_of_line_to_render += 1;
                 }

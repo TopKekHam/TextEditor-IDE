@@ -157,6 +157,9 @@ namespace R.TextEditor
             }
             else
             {
+
+                bool selection_active = Input.KeyPressed(SDL_Scancode.KEY_LSHIFT);
+
                 if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
                 {
                     AppState.move_speed_modifier = 4;
@@ -168,28 +171,28 @@ namespace R.TextEditor
 
                 if (Input.DoInputHolder(SDL_Scancode.KEY_LEFT, ref AppState.inputs[(int)InputHoldKey.LEFT], AppState.move_speed_modifier))
                 {
-                    AppState.buffer.MoveCursor(new Vector2I() { x = -1, y = 0 });
+                    AppState.buffer.MoveCursor(new Vector2I() { x = -1, y = 0 }, selection_active);
                     AppState.cursor_remembered_x = AppState.buffer.cursor.x;
                     AppState.text_editor.ResetCursorOn();
                 }
 
                 if (Input.DoInputHolder(SDL_Scancode.KEY_RIGHT, ref AppState.inputs[(int)InputHoldKey.RIGHT], AppState.move_speed_modifier))
                 {
-                    AppState.buffer.MoveCursor(new Vector2I() { x = 1, y = 0 });
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 1, y = 0 }, selection_active);
                     AppState.cursor_remembered_x = AppState.buffer.cursor.x;
                     AppState.text_editor.ResetCursorOn();
                 }
 
                 if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref AppState.inputs[(int)InputHoldKey.UP], AppState.move_speed_modifier))
                 {
-                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = -1 });
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = -1 }, selection_active);
                     PutCursorOnRememberedX();
                     AppState.text_editor.ResetCursorOn();
                 }
 
                 if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref AppState.inputs[(int)InputHoldKey.DOWN], AppState.move_speed_modifier))
                 {
-                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = 1 });
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = 1 }, selection_active);
                     PutCursorOnRememberedX();
                     AppState.text_editor.ResetCursorOn();
                 }

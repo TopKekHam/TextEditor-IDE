@@ -188,7 +188,7 @@ namespace R
         }
 
         //return the maximum length of the text in pixels.
-        public static float GetTextWidth(Ascii_Font font, string text, float size, int number_of_chars = -1)
+        public static float GetTextWidth(Ascii_Font font, string text, float size, int number_of_chars = -1, int start_idx = -1)
         {
             float text_width = 0;
             float max_width = 0;
@@ -198,7 +198,12 @@ namespace R
                 number_of_chars = text.Length;
             }
 
-            for (int i = 0; i < number_of_chars; i++)
+            if(start_idx == -1)
+            {
+                start_idx = 0;
+            }
+
+            for (int i = start_idx; i < start_idx + number_of_chars; i++)
             {
                 if (text[i] == '\n')
                 {

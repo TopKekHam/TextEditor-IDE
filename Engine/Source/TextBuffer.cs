@@ -60,6 +60,8 @@ namespace R
         public List<string> lines;
         public Vector2I cursor;
         public TextBufferActionList actions = new TextBufferActionList();
+        public Vector2I selection_ancor;
+        public bool selection_active = false;
 
         public static TextBuffer Create()
         {
@@ -165,8 +167,21 @@ namespace R
             lines.Insert(cursor.y, inserted_string);
         }
 
-        public void MoveCursor(Vector2I move_vec)
+        public void MoveCursor(Vector2I move_vec, bool selection = false)
         {
+
+            if (!selection)
+            {
+                selection_ancor = cursor;
+            }
+
+            if(!selection_active && selection)
+            {
+                selection_ancor = cursor;
+            }
+
+            selection_active = selection;
+
             if (move_vec.y != 0)
             {
                 var height = lines.Count;
@@ -290,7 +305,7 @@ namespace R
                     break;
             }
 
-            if(save_action_to_buffer)
+            if (save_action_to_buffer)
             {
                 actions.AddAction(action);
             }
@@ -367,7 +382,7 @@ namespace R
 
         public void RedoLastAction()
         {
-            if(actions.MoveNext())
+            if (actions.MoveNext())
             {
                 ExecuteAction(actions.Current(), false);
             }
