@@ -1,25 +1,35 @@
 ﻿using R;
+using System;
 using System.IO;
 using System.Numerics;
 
 namespace R.TextEditor
 {
 
+    public enum InputHoldKey
+    {
+        LEFT, RIGHT, UP, DOWN, REMOVE_CHAR, UNDO, REDO
+    }
+
     public static unsafe class AppState
     {
         public static UIContext context;
         public static TextBuffer buffer;
         public static UIE_TextEditor text_editor;
-
-        public static InputHold[] inputs = new InputHold[] {
-            InputHold.Default, //left
-            InputHold.Default, //right
-            InputHold.Default, //up
-            InputHold.Default, //down
-            InputHold.Default, // remove char
-        };
-
+        public static InputHold[] inputs;
         public static int cursor_remembered_x = 0;
+        public static float move_speed_modifier = 1;
+
+        static AppState()
+        {
+            inputs = new InputHold[Enum.GetNames(typeof(InputHoldKey)).Length];
+
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                inputs[i] = InputHold.Default;
+            }
+        }
+
     }
 
     public static unsafe class TextEditor
@@ -104,49 +114,125 @@ namespace R.TextEditor
         static void DoTextEditor()
         {
 
-            if (Input.DoInputHolder(SDL_Scancode.KEY_LEFT, ref AppState.inputs[0]))
+            if (Input.KeyPressed(SDL_Scancode.KEY_LALT))
             {
-                AppState.buffer.MoveCursor(new Vector2I() { x = -1, y = 0 });
-                AppState.cursor_remembered_x = AppState.buffer.cursor.x;
-                AppState.text_editor.ResetCursorOn();
+                if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
+                {
+                    if (Input.KeyDown(SDL_Scancode.KEY_UP))
+                    {
+                        AppState.buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.DuplicateLine,
+                            duplicated_line_diraction = -1
+                        });
+                    }
+                    else if (Input.KeyDown(SDL_Scancode.KEY_DOWN))
+                    {
+                        AppState.buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.DuplicateLine,
+                            duplicated_line_diraction = 1
+                        });
+                    }
+                }
+                else
+                {
+                    if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref AppState.inputs[(int)InputHoldKey.UP]))
+                    {
+                        AppState.buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.SwapLine,
+                            swaped_line_diraction = -1
+                        });
+                    }
+                    else if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref AppState.inputs[(int)InputHoldKey.DOWN]))
+                    {
+                        AppState.buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.SwapLine,
+                            swaped_line_diraction = 1
+                        });
+                    }
+                }
+            }
+            else
+            {
+                if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
+                {
+                    AppState.move_speed_modifier = 4;
+                }
+                else
+                {
+                    AppState.move_speed_modifier = 1;
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_LEFT, ref AppState.inputs[(int)InputHoldKey.LEFT], AppState.move_speed_modifier))
+                {
+                    AppState.buffer.MoveCursor(new Vector2I() { x = -1, y = 0 });
+                    AppState.cursor_remembered_x = AppState.buffer.cursor.x;
+                    AppState.text_editor.ResetCursorOn();
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_RIGHT, ref AppState.inputs[(int)InputHoldKey.RIGHT], AppState.move_speed_modifier))
+                {
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 1, y = 0 });
+                    AppState.cursor_remembered_x = AppState.buffer.cursor.x;
+                    AppState.text_editor.ResetCursorOn();
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref AppState.inputs[(int)InputHoldKey.UP], AppState.move_speed_modifier))
+                {
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = -1 });
+                    PutCursorOnRememberedX();
+                    AppState.text_editor.ResetCursorOn();
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref AppState.inputs[(int)InputHoldKey.DOWN], AppState.move_speed_modifier))
+                {
+                    AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = 1 });
+                    PutCursorOnRememberedX();
+                    AppState.text_editor.ResetCursorOn();
+                }
             }
 
-            if (Input.DoInputHolder(SDL_Scancode.KEY_RIGHT, ref AppState.inputs[1]))
+            if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
             {
-                AppState.buffer.MoveCursor(new Vector2I() { x = 1, y = 0 });
-                AppState.cursor_remembered_x = AppState.buffer.cursor.x;
-                AppState.text_editor.ResetCursorOn();
-            }
-
-            if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref AppState.inputs[2]))
-            {
-                AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = -1 });
-                PutCursorOnRememberedX();
-                AppState.text_editor.ResetCursorOn();
-            }
-
-            if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref AppState.inputs[3]))
-            {
-                AppState.buffer.MoveCursor(new Vector2I() { x = 0, y = 1 });
-                PutCursorOnRememberedX();
-                AppState.text_editor.ResetCursorOn();
+                if (Input.DoInputHolder(SDL_Scancode.KEY_Z, ref AppState.inputs[(int)InputHoldKey.UNDO]))
+                {
+                    AppState.buffer.UndoLastAction();
+                }
+                if (Input.DoInputHolder(SDL_Scancode.KEY_Y, ref AppState.inputs[(int)InputHoldKey.REDO]))
+                {
+                    AppState.buffer.RedoLastAction();
+                }
             }
 
             if (Input.KeyDown(SDL_Scancode.KEY_RETURN))
             {
-                AppState.buffer.NextLine();
+                AppState.buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.NextLine
+                });
+
                 AppState.text_editor.ResetCursorOn();
             }
 
-            if (Input.DoInputHolder(SDL_Scancode.KEY_BACKSPACE, ref AppState.inputs[4]))
+            if (Input.DoInputHolder(SDL_Scancode.KEY_BACKSPACE, ref AppState.inputs[(int)InputHoldKey.REMOVE_CHAR]))
             {
-                AppState.buffer.RemoveChar();
+                AppState.buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.RemoveChar
+                });
                 AppState.text_editor.ResetCursorOn();
             }
 
             if (Input.KeyDown(SDL_Scancode.KEY_TAB))
             {
-                AppState.buffer.InsertText("    ");
+                AppState.buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.InsertText,
+                    inserted_text = "    "
+                });
                 AppState.text_editor.ResetCursorOn();
             }
 
@@ -181,7 +267,11 @@ namespace R.TextEditor
                     }
                 }
 
-                AppState.buffer.InsertText(filterd_string);
+                AppState.buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.InsertText,
+                    inserted_text = filterd_string
+                });
                 AppState.text_editor.ResetCursorOn();
             }
 

@@ -126,6 +126,11 @@ namespace R
             return (byte*)Marshal.StringToHGlobalAnsi(str).ToPointer();
         }
 
+        public static T At<T>(this T[] arr, Object en)
+        {
+            return arr[(int)en];
+        }
+
     }
 
     public unsafe struct ArrayList<T>

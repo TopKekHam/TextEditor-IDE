@@ -36,7 +36,7 @@
             return (Engine.keyboard_state[(int)scancode] & (byte)InputState.UP) > 0;
         }
 
-        public static bool DoInputHolder(SDL_Scancode scancode, ref InputHold input_holder)
+        public static bool DoInputHolder(SDL_Scancode scancode, ref InputHold input_holder, float speed_modifier = 1)
         {
             if (KeyPressed(scancode))
             {
@@ -48,11 +48,11 @@
                 }
                 else
                 {
-                    input_holder.rejection_timer += Engine.delta_time;
+                    input_holder.rejection_timer += Engine.delta_time * speed_modifier;
 
                     if (input_holder.rejection_timer > input_holder.rejection_time)
                     {
-                        input_holder.input_timer += Engine.delta_time;
+                        input_holder.input_timer += Engine.delta_time * speed_modifier;
 
                         if (input_holder.input_timer > input_holder.time_between_inputs)
                         {
