@@ -1,5 +1,5 @@
 ﻿using FreeImageAPI;
-using System.Diagnostics;
+using System;
 using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -87,21 +87,27 @@ namespace R
             return false;
         }
 
-        public static bool LoadAsciiFont(string path, out Ascii_Font font)
+        public static bool LoadAsciiFont(string path, ref Ascii_Font font)
         {
             font = new Ascii_Font();
 
             font.glyphs = new Ascii_Glyph[256];
 
-            font = LoadFontData(path, font);
+            LoadFontData(path, ref font);
 
             bool loaded = LoadTexture(font.texture_path, out RamTexture ram_texture);
 
             if (loaded)
             {
-                font = GenerateAsciiFontTexture(font, ram_texture);
-                font.d_pixel_between_characters = 2;
-                font.d_pixel_line_height = (int)(font.glyph_size_in_pixels * 1.25f);
+                font.texture_width = ram_texture.width;
+                font.texture_height = ram_texture.height;
+                int glyph_size = font.texture_width / 16;
+                font.pixel_size = 1.0f / (16.0f * glyph_size);
+                InitAsciiFontSizes(ref font, glyph_size);
+
+                GenerateAsciiFontTexture(ref font, ram_texture);
+
+                font.texture = GFX.BufferTexture(ram_texture.data, ram_texture.width, ram_texture.height, TextureType.BIT_32);
 
                 return true;
             }
@@ -109,8 +115,130 @@ namespace R
             return false;
         }
 
+        public static bool LoadAsciiFontFromTTFFile(string path, ref Ascii_Font font, int glyph_size)
+        {
+            font.glyphs = new Ascii_Glyph[256];
+            float padding_ratio = 1.25f;
+            int glyph_cell_size = (int)(glyph_size * padding_ratio);
+            int texture_size = 16 * glyph_cell_size;
+            
+            InitAsciiFontSizes(ref font, glyph_cell_size);
+
+            font.natural_offset = glyph_cell_size - glyph_size;
+            font.texture_width = texture_size;
+            font.texture_height = texture_size;
+            font.pixel_size = 1.0f / (float)(glyph_cell_size * 16);
+
+            stbtt_fontinfo info = new stbtt_fontinfo();
+            try
+            {
+                byte[] file = File.ReadAllBytes(path);
+                fixed (byte* file_ptr = file)
+                {
+                    stbtt_InitFont(info, file_ptr, stbtt_GetFontOffsetForIndex(file_ptr, 0));
+
+                }
+            }
+            catch (Exception) { Console.WriteLine($"Couldn't load font: {path}"); return false; }
+
+            int[] texture = new int[texture_size * texture_size];
+
+            int xc = 0, yc = font.texture_height - 1; // current x and current y
+
+            int x0, x1, y0, y1;
+            stbtt_GetFontBoundingBox(info, &x0, &y0, &x1, &y1);
+
+            for (int glyph_idx = 0; glyph_idx < 256; glyph_idx++)
+            {
+
+
+                int glyph_width, glyph_height;
+                int offset_x, offset_y;
+                byte* char_bitmap = stbtt_GetCodepointBitmap(info, 0, stbtt_ScaleForPixelHeight(info, glyph_size), (byte)glyph_idx, &glyph_width, &glyph_height, &offset_x, &offset_y);
+
+                if (xc + glyph_width >= texture_size)
+                {
+                    yc -= glyph_cell_size;
+                    xc = 0;
+                }
+
+                var char_bitmap_ptr = char_bitmap;
+                var y_start = glyph_cell_size - glyph_height;
+
+                //int draw_color = ((glyph_idx + (glyph_idx / 16) % 2) % 2 == 0) ? (255 + (255 << 8) + (255 << 24)) : ((255 << 8) + (255 << 16) + (255 << 24));
+                //for (int y = 0; y < glyph_cell_size; y++)
+                //{
+                //    for (int x = 0; x < glyph_width; x++)
+                //    {
+                //        texture[(x + xc) + ((yc - y) * texture_size)] = draw_color;
+                //    }
+                //}
+
+                for (int y = 0; y < glyph_height; y++)
+                {
+                    for (int x = 0; x < glyph_width; x++)
+                    {
+                        byte val = *char_bitmap_ptr;
+                        char_bitmap_ptr++;
+
+                        texture[(x + xc) + ((yc - y - y_start) * texture_size)] = val + (val << 8) + (val << 16) + (val << 24);
+                    }
+                }
+
+                //float glyph_start_xf = (float)xc / (float)texture_size;
+                //float glyph_widthf = (float)glyph_width / (float)texture_size;
+                //float glyph_start_yf = (float)(yc - y_start) / (float)texture_size;
+                //float glyph_heightf = (float)glyph_height / (float)texture_size;
+
+                //if ((char)glyph_idx == ' ')
+                //{
+                //    glyph_widthf = ((float)glyph_size / 2.5f) / (float)texture_size;
+                //}
+
+                //font.glyphs[glyph_idx].uv_top_right = new Vector2(glyph_start_xf + glyph_widthf, glyph_start_yf);
+                //font.glyphs[glyph_idx].uv_bottom_left = new Vector2(glyph_start_xf, glyph_start_yf - glyph_heightf);
+                //font.glyphs[glyph_idx].width = glyph_widthf;
+                //font.glyphs[glyph_idx].height = glyph_heightf;
+
+
+
+                font.glyphs[glyph_idx].base_line_offset = (glyph_cell_size - glyph_height) - offset_y - glyph_cell_size;
+                xc += glyph_cell_size;
+                stbtt_FreeBitmap(char_bitmap, (void*)0);
+            }
+
+            fixed (void* ptr = texture)
+            {
+                RamTexture tex = new RamTexture()
+                {
+                    data = (byte*)ptr,
+                    width = texture_size,
+                    height = texture_size
+                };
+
+                GenerateAsciiFontTexture(ref font, tex);
+            }
+
+            fixed (int* texture_ptr = texture)
+            {
+                font.texture = GFX.BufferTexture(texture_ptr, texture_size, texture_size, TextureType.BIT_32);
+            }
+
+            font.d_ratio_between_characters /= padding_ratio;
+            font.d_ratio_line_height /= padding_ratio;
+
+            return true;
+        }
+
+        static void InitAsciiFontSizes(ref Ascii_Font font, int glyph_size)
+        {
+            font.glyph_size_in_pixels = glyph_size;
+            font.d_ratio_between_characters = 1f;
+            font.d_ratio_line_height = 1.125f;
+        }
+
         //texture format 16 x 16 tilemap.
-        public static Ascii_Font GenerateAsciiFontTexture(Ascii_Font font, RamTexture texture, uint transperent_mask = 0xFF000000)
+        static void GenerateAsciiFontTexture(ref Ascii_Font font, RamTexture texture, uint transperent_mask = 0xFF000000)
         {
             uint* pixel = (uint*)texture.data;
 
@@ -128,6 +256,8 @@ namespace R
 
                     glyphs[offset].min_x = -1;
                     glyphs[offset].max_x = -1;
+                    glyphs[offset].min_y = -1;
+                    glyphs[offset].max_y = -1;
                 }
             }
 
@@ -139,10 +269,13 @@ namespace R
                     int glyph_y = y / glyph_size;
                     int offset = glyph_x + ((15 - glyph_y) * 16);
 
-                    if ((*pixel & transperent_mask) == transperent_mask)
+                    if ((*pixel & transperent_mask) > 0)
                     {
                         if (glyphs[offset].min_x > x || glyphs[offset].min_x == -1) glyphs[offset].min_x = x;
                         if (glyphs[offset].max_x < x || glyphs[offset].max_x == -1) glyphs[offset].max_x = x;
+
+                        if (glyphs[offset].min_y > y || glyphs[offset].min_y == -1) glyphs[offset].min_y = y;
+                        if (glyphs[offset].max_y < y || glyphs[offset].max_y == -1) glyphs[offset].max_y = y;
                     }
 
                     pixel += 1;
@@ -156,10 +289,10 @@ namespace R
                     int offset = x + (y * height);
 
                     glyphs[offset].uv_top_right = new Vector2((float)(glyphs[offset].max_x + 1) / (float)texture.width,
-                                                              (float)((16 - y) * glyph_size) / (float)texture.height);
+                                                              (float)(glyphs[offset].max_y + 1) / (float)texture.height);
 
                     glyphs[offset].uv_bottom_left = new Vector2((float)(glyphs[offset].min_x) / (float)texture.width,
-                                                                (float)((15 - y) * glyph_size) / (float)texture.height);
+                                                                (float)(glyphs[offset].min_y) / (float)texture.height);
 
                     if (offset == (int)' ')
                     {
@@ -170,19 +303,12 @@ namespace R
                         glyphs[offset].width = (float)((glyphs[offset].max_x - glyphs[offset].min_x) + 1) / (float)texture.width;
                     }
 
-                    glyphs[offset].height = (float)glyph_size / (float)texture.height;
+                    glyphs[offset].height = (float)((glyphs[offset].max_y - glyphs[offset].min_y) + 1) / (float)texture.height;
                 }
             }
-
-            font.glyphs = glyphs;
-            font.glyph_size_in_pixels = glyph_size;
-            font.pixel_size = 1.0f / (16.0f * glyph_size);
-            font.texture = GFX.BufferTexture(texture.data, texture.width, texture.height, TextureType.BIT_32);
-
-            return font;
         }
 
-        public static Ascii_Font LoadFontData(string path, Ascii_Font font)
+        public static void LoadFontData(string path,ref Ascii_Font font)
         {
             var doc = LoadKeyValueDoc(path);
 
@@ -202,8 +328,6 @@ namespace R
                     }
                 }
             }
-
-            return font;
         }
 
         public static ArrayList<Key_Value> LoadKeyValueDoc(string path)
@@ -234,92 +358,6 @@ namespace R
             }
 
             return data;
-        }
-
-        public static TTF_Font LoadTTFFontAsciiChars(string path)
-        {
-            char[] chars = new char[256];
-
-            for (int i = 0; i < chars.Length; i++)
-            {
-                chars[0] = (char)i;
-            }
-
-            return LoadTTFFont(path, chars);
-        }
-
-        public static TTF_Font LoadTTFFont(string path, char[] chars_to_load, int line_height = 128)
-        {
-            int texture_size = 2048;
-
-            byte[] file = File.ReadAllBytes(path);
-            TTF_Font font = new TTF_Font();
-            font.info = new stbtt_fontinfo();
-            font.texture_size = texture_size;
-            font.line_height = line_height;
-
-            fixed (byte* file_ptr = file)
-            {
-                stbtt_InitFont(font.info, file_ptr, stbtt_GetFontOffsetForIndex(file_ptr, 0));
-            }
-
-            int[] texture = new int[texture_size * texture_size];
-
-            int xc = 0, yc = 0; // current x and current y
-            int current_hightest_height = 0;
-
-            font.glyphs = new TTF_Glyph[chars_to_load.Length];
-
-            for (int i = 0; i < chars_to_load.Length; i++)
-            {
-
-                int glyph_width, glyph_height;
-                int offset_x, offset_y;
-                byte* char_bitmap = stbtt_GetCodepointBitmap(font.info, 0, stbtt_ScaleForPixelHeight(font.info, font.line_height), (byte)chars_to_load[i], &glyph_width, &glyph_height, &offset_x, &offset_y);
-
-                if (xc + glyph_width >= texture_size)
-                {
-                    yc += current_hightest_height;
-                    current_hightest_height = 0;
-                    xc = 0;
-                    Debug.Assert(yc + glyph_height <= texture_size, "no all glyphs cant fit in the texture!");
-                }
-
-                var char_bitmap_ptr = char_bitmap;
-
-                for (int y = 0; y < glyph_height; y++)
-                {
-                    for (int x = 0; x < glyph_width; x++)
-                    {
-                        byte val = *char_bitmap_ptr;
-                        char_bitmap_ptr++;
-
-                        texture[(x + xc) + ((y + yc) * texture_size)] = val + (val << 8) + (val << 16) + (val << 24);
-                    }
-                }
-
-                xc += glyph_width;
-                current_hightest_height = glyph_height > current_hightest_height ? glyph_height : current_hightest_height;
-
-                stbtt_FreeBitmap(char_bitmap, (void*)0);
-
-                TTF_Glyph glyph = new TTF_Glyph();
-                glyph.width = glyph_width;
-                glyph.height = glyph_height;
-                glyph.offset = new Vector2((float)offset_x / (float)texture_size, (float)offset_y / (float)texture_size);
-                glyph.uv_top_right = new Vector2((float)xc / (float)texture_size, (float)yc / (float)texture_size);
-                glyph.uv_top_right = new Vector2((float)(xc + glyph_width) / (float)texture_size, (float)(yc + glyph_height) / (float)texture_size);
-            }
-
-            fixed (int* texture_ptr = texture)
-            {
-                font.texture = GFX.BufferTexture(texture_ptr, texture_size, texture_size, TextureType.BIT_32);
-            }
-
-            font.glyph_lookup_table = new char[chars_to_load.Length];
-            chars_to_load.CopyTo(font.glyph_lookup_table, 0);
-
-            return font;
         }
 
     }

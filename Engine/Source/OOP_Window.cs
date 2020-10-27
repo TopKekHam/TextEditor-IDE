@@ -19,7 +19,7 @@ namespace R
 
         public OOP_Window()
         {
-            Engine.Init();
+            Engine.Init("");
             Renderer.Init();
             back_buffer_texture = GFX.CreateTexture();
             back_buffer = Engine.Malloc(back_buffer_size.x * back_buffer_size.y * sizeof(int));

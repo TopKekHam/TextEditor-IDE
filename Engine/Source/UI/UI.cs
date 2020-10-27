@@ -37,6 +37,7 @@ namespace R
         public bool hot_item;
         public bool active_item;
         public bool clickable = false;
+        public bool enabled = true;
         public RectTransform rect = new RectTransform();
         public abstract void Update(Vector2 canvas_size);
         public abstract void Render(Vector2 canvas_size);
@@ -157,6 +158,7 @@ namespace R
 
                 for (int i = 1; i < context.elements.Count; i++)
                 {
+                    if (!context.elements[i].enabled || !context.elements[i - 1].enabled) continue;
                     if (context.elements[i - 1].rect.transform.position.Z < context.elements[i].rect.transform.position.Z)
                     {
                         sorted = false;
@@ -203,6 +205,7 @@ namespace R
 
             for (int i = context.elements.Count - 1; i >= 0; i--)
             {
+                if (!context.elements[i].enabled) continue;
                 context.elements[i].Update(state.canvas_size);
             }
 
@@ -211,12 +214,11 @@ namespace R
 
         public static void Render(float width, float height, UIContext context)
         {
-            Renderer.CameraPosition = Transform.Zero;
-            Renderer.SetCameraSize(width / 2, height / 2);
-            GFX.DisableDepthTest();
+            SetupCamera(width, height);
 
             for (int i = context.elements.Count - 1; i >= 0; i--)
             {
+                if (!context.elements[i].enabled) continue;
                 context.elements[i].Render(state.canvas_size);
             }
         }
@@ -264,13 +266,9 @@ namespace R
             Renderer.FlipY = false;
         }
 
-        public static void DrawRect(RectTransform transform, Material material)
+        public static void DrawRect(RectTransform rect_transform, Material material)
         {
-            Transform tran = Transform.Zero;
-            tran.position = transform.CalcPosition(state.canvas_size);
-            var size = transform.CalcRectSize(state.canvas_size);
-
-            Renderer.DrawQuad(tran, size, material);
+            Renderer.DrawQuad(rect_transform.transform, rect_transform.size, material);
         }
 
     }
@@ -288,8 +286,33 @@ namespace R
     public class RectTransform
     {
         public Transform transform = Transform.Zero;
-        public float width = 100, height = 100;
+        public Vector2 size;
         public RectTransform parent = null;
+
+        
+        public void Align(Vector2 canvas, RectAlignment horizontal_alignment, RectAlignment vertical_alignment)
+        {
+            transform.position.X = CalcAlignment(horizontal_alignment, size.X / 2, canvas.X / 2);
+            transform.position.Y = -CalcAlignment(vertical_alignment, size.Y / 2, canvas.Y / 2);
+        }
+
+        float CalcAlignment(RectAlignment alignment, float half_size, float canvas_half_size)
+        {
+            float end_value = 0;
+
+            if (alignment == RectAlignment.Start)
+            {
+                end_value += -canvas_half_size + half_size;
+            }
+            else if (alignment == RectAlignment.End)
+            {
+                end_value += canvas_half_size -half_size;
+            }
+
+            return end_value;
+        }
+
+        /*
         public RectAlignment horizontal_alignment = RectAlignment.Center, vertical_alignment = RectAlignment.Center;
         public RectSizing horizontal_sizing = RectSizing.OneToOne, vertical_sizing = RectSizing.OneToOne;
 
@@ -329,51 +352,11 @@ namespace R
 
             return end_value;
         }
-
-        public Vector3 CalcPosition(Vector2 canvas)
-        {
-            Vector3 pos = transform.position;
-            Vector2 size = CalcRectSize(canvas);
-
-            Vector2 parent_size = canvas;
-            Vector3 parent_position = Vector3.Zero;
-
-            if (parent != null)
-            {
-                parent_size = parent.CalcRectSize(canvas);
-                parent_position = parent.CalcPosition(canvas);
-            }
-
-            pos.X = CalcAlignment(horizontal_alignment, transform.position.X, size.X / 2, parent_position.X, parent_size.X / 2);
-            pos.Y = CalcAlignment(vertical_alignment, transform.position.Y, size.Y / 2, parent_position.Y, parent_size.Y / 2);
-
-            return pos;
-        }
-
-        public float CalcAlignment(RectAlignment alignment, float value, float half_size, float parent_value, float parent_half_size)
-        {
-            float end_value = 0;
-
-            if (alignment == RectAlignment.Start)
-            {
-                end_value += (-parent_half_size + parent_value) + (half_size + value);
-            }
-            else if (alignment == RectAlignment.Center)
-            {
-                end_value += (parent_value) + (value);
-            }
-            else if (alignment == RectAlignment.End)
-            {
-                end_value += (parent_half_size + parent_value) + (-half_size + value);
-            }
-
-            return end_value;
-        }
-        
+        */
         public bool PointInside(Vector2 canvas, Vector2 point)
         {
-            var pos = CalcPosition(canvas);
-            var half_size = CalcRectSize(canvas) / 2;
+            var pos = transform.position;
+            var half_size = size / 2;
 
             return (pos.X - half_size.X < point.X &&
                     pos.X + half_size.X > point.X &&

@@ -7,6 +7,7 @@ using System.Text;
 public class SDL
 {
     const string dll_path = "Dlls/SDL2.dll";
+    public static int WINDOW_CENTERED = 0x2FFF0000;
 
     #region UTF8 Marshaling
 
@@ -164,6 +165,9 @@ public class SDL
     [DllImport(dll_path, EntryPoint = "SDL_PollEvent", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int PollEvent(out SDL_Event envt);
 
+    [DllImport(dll_path, EntryPoint = "SDL_PumpEvents", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern void PumpEvents();
+
     [DllImport(dll_path, EntryPoint = "SDL_GL_SwapWindow", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int GL_SwapWindow(IntPtr gl_context);
 
@@ -204,6 +208,18 @@ public class SDL
     [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_SetWindowSize", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern void SetWindowSize(IntPtr window, int w, int h);
 
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_SetWindowBordered", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void SetWindowBordered(IntPtr window, bool bordered);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_MaximizeWindow", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void MaximizeWindow(IntPtr window);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_MinimizeWindow", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void MinimizeWindow(IntPtr window);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_SetWindowFullscreen", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int SetWindowFullscreen(IntPtr window, SDL_WINDOW_FLAGS flags);
+
     [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_GetNumAudioDrivers", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern int GetNumAudioDrivers();
 
@@ -221,6 +237,31 @@ public class SDL
 
     [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_PauseAudioDevice", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern void PauseAudioDevice(uint dev, int pause_on);
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_GetClipboardText", CallingConvention = CallingConvention.Cdecl)]
+    static unsafe extern char* inner_GetClipboardText();
+
+    public static unsafe string GetClipboardText()
+    {
+        var ptr = inner_GetClipboardText();
+        var res = UTF8_ToManaged((IntPtr)ptr);
+        Free((IntPtr)ptr);
+        return res;
+    }
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_HasClipboardText", CallingConvention = CallingConvention.Cdecl)]
+    public static unsafe extern bool HasClipboardText();
+
+    [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_SetClipboardText", CallingConvention = CallingConvention.Cdecl)]
+    static unsafe extern int inner_SetClipboardText(byte* text);
+
+    public static unsafe bool SetClipboardText(string text)
+    {
+        var ptr = text.ToCStr();
+        var res = inner_SetClipboardText(ptr) == 0;
+        Marshal.FreeHGlobal((IntPtr)ptr);
+        return res;
+    }
 
     [DllImport(dll_path, CharSet = CharSet.Auto, EntryPoint = "SDL_RWFromFile", CallingConvention = CallingConvention.Cdecl)]
     public static unsafe extern IntPtr RWFromFile(byte* file, byte* mode);
@@ -255,6 +296,7 @@ public enum SDL_INIT_FLAGS : uint
 [Flags]
 public enum SDL_WINDOW_FLAGS
 {
+    NONE = 0,
     FULLSCREEN = 0x00000001,         /**< fullscreen window */
     OPENGL = 0x00000002,             /**< window usable with OpenGL context */
     SHOWN = 0x00000004,              /**< window is visible */

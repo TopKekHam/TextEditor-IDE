@@ -2,6 +2,12 @@
  
 ## Todos
 
+### next task
+
+- generate Ascii_Font from ttf file(kinda works...).
+
+### later
+
 - multi-line comment
 - complier defines
 - selection

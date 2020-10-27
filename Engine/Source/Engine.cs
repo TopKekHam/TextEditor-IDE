@@ -47,8 +47,9 @@ namespace R
         public static float delta_time;
         public static MouseState mouse_state;
         public static int frame_cap = -1; // if frame cap less equils to 0, frame cap disabled.
+        public static byte* sdl_keyboard_state;
 
-        public static void Init(int width = 800, int height = 600)
+        public static void Init(string window_title, int width = 800, int height = 600)
         {
 
             if (SDL.Init(SDL_INIT_FLAGS.VIDEO | SDL_INIT_FLAGS.EVENTS | SDL_INIT_FLAGS.AUDIO) > 0)
@@ -56,9 +57,14 @@ namespace R
                 Console.WriteLine("something bad happend");
             }
 
+            sdl_keyboard_state = (byte*)SDL.GetKeyboardState(out int keynums);
+
             Opengl.SetGLAtrribs();
 
-            window = SDL.CreateWindow("game engine", 200, 100, width, height, SDL_WINDOW_FLAGS.OPENGL | SDL_WINDOW_FLAGS.RESIZABLE);
+            window = SDL.CreateWindow(window_title, SDL.WINDOW_CENTERED, SDL.WINDOW_CENTERED, width, height, 
+                SDL_WINDOW_FLAGS.OPENGL | SDL_WINDOW_FLAGS.RESIZABLE | 
+                (width == -1 ? SDL_WINDOW_FLAGS.MAXIMIZED : SDL_WINDOW_FLAGS.NONE));
+
             window_size = new Vector2(width, height);
             opengl_context = SDL.GL_CreateContext(window);
             Opengl.LoadGLProcs();
@@ -90,12 +96,11 @@ namespace R
             prev_ticks = ticks_now;
 
             Input.this_frame_string_input = null;
-            
-            byte* state = (byte*)SDL.GetKeyboardState(out int keynums);
+            Input.got_user_input_this_frame = false;
 
             for (int i = 0; i < keyboard_state.Length; i++)
             {
-                if (*(state + i) > 0)
+                if (*(sdl_keyboard_state + i) > 0)
                 {
                     if ((keyboard_state[i] & (byte)InputState.PRESSED) == 0)
                     {
@@ -105,6 +110,8 @@ namespace R
                     {
                         keyboard_state[i] = Utils.ClearBits(keyboard_state[i], (byte)InputState.DOWN);
                     }
+
+                    Input.got_user_input_this_frame = true;
 
                     keyboard_state[i] |= (byte)InputState.PRESSED;
                 }
@@ -129,7 +136,6 @@ namespace R
 
         public static int PollEvent(out SDL_Event evnt)
         {
-
             var new_event = new SDL_Event();
 
             int r_value = SDL.PollEvent(out new_event);
@@ -148,7 +154,8 @@ namespace R
 
                 if (new_event.type == SDL_EVENT_TYPE.TEXTINPUT)
                 {
-                    Input.this_frame_string_input = SDL.UTF8_ToManaged(new IntPtr(new_event.text_input.text));
+                    var str = SDL.UTF8_ToManaged(new IntPtr(new_event.text_input.text));
+                    Input.this_frame_string_input += str;
                 }
 
             }
@@ -258,6 +265,26 @@ namespace R
             SDL.SetWindowSize(window, width, height);
             GFX.SetViewport((uint)width, (uint)height);
             window_size = new Vector2(width, height);
+        }
+
+        public static void SetWindowBordered(bool value)
+        {
+            SDL.SetWindowBordered(window, value);
+        }
+
+        public static void MaximizeWindow()
+        {
+            SDL.MaximizeWindow(window);
+        }
+
+        public static void MinimizeWindow()
+        {
+            SDL.MinimizeWindow(window);
+        }
+
+        public static void SetWindowFullscreen(SDL_WINDOW_FLAGS flags)
+        {
+            SDL.SetWindowFullscreen(window, flags);
         }
 
         public static void LogError(string text)

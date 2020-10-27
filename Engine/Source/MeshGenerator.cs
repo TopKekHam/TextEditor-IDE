@@ -1,6 +1,4 @@
-﻿using Microsoft.VisualBasic.CompilerServices;
-using System.Numerics;
-using System.Reflection.Metadata;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace R

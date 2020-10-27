@@ -1,5 +1,4 @@
-﻿using System;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace R
@@ -11,19 +10,22 @@ namespace R
         public Vector2 uv_top_right;
         public float width, height;
         public int base_line_offset;
-        public int min_x, max_x; // used only while building font.
+        public int min_x, max_x, min_y, max_y; // used only while building font.
     }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Ascii_Font
     {
         public Ascii_Glyph[] glyphs;
-        public string texture_path;
+        public string texture_path; // can be null if loaded from TTF file.
         public uint texture;
         public int texture_width, texture_height, glyph_size_in_pixels;
         public float pixel_size;
-        public int d_pixel_between_characters;
-        public int d_pixel_line_height;
+        public int natural_offset;
+
+        //this values can be changed freely.
+        public float d_ratio_between_characters;
+        public float d_ratio_line_height;
     }
 
     public class Ascii_Font_Utils
@@ -70,7 +72,23 @@ namespace R
             shader = GFX.LoadShader(vert_ascii_text, frag_ascii_text);
         }
 
-        public static Mesh GenerateTextMesh(Ascii_Font font, string text, float size, Vector4[] colors)
+        public unsafe static Mesh GenerateTextMesh(Ascii_Font font, string text, float size, Vector4[] colors)
+        {
+            fixed(Vector4* colors_ptr = colors)
+            {
+                return GenerateTextMesh(font, text, size, colors_ptr);
+            }
+        }
+
+        public unsafe static Mesh GenerateTextMesh(Ascii_Font font, string text, float size, ArrayList<Vector4> colors)
+        {
+            fixed (Vector4* colors_ptr = colors.data)
+            {
+                return GenerateTextMesh(font, text, size, colors_ptr);
+            }
+        }
+
+        public unsafe static Mesh GenerateTextMesh(Ascii_Font font, string text, float size, Vector4* colors)
         {
             Mesh mesh = new Mesh();
             int char_size = 4 * (3 + 2 + 4); // 4 vertices ,3 pos components, 2 uv components , 4 color components (component is f32).
@@ -78,13 +96,13 @@ namespace R
             uint[] indices = new uint[text.Length * 6];
 
             float padding_x = 0;
-            float padding_y = 0;
+            float padding_y = font.pixel_size * (float)font.natural_offset * size * character_in_line;
 
             for (int i = 0; i < text.Length; i++)
             {
                 if (text[i] == '\n')
                 {
-                    padding_y -= (font.pixel_size * font.d_pixel_line_height) * size * character_in_line;
+                    padding_y -= font.d_ratio_line_height * size * character_in_line;
                     padding_x = 0;
                     continue;
                 }
@@ -99,64 +117,64 @@ namespace R
 
                     float line_base_offset = (font.pixel_size * (float)glyph.base_line_offset) * size * character_in_line; 
 
-                    float glyph_top = (-glyph.height * character_in_line * size) + padding_y;
-                    float glyph_right_side = (glyph.width * character_in_line * size) + padding_x;
-
+                    float height = (glyph.height * character_in_line * size);
+                    float width = (glyph.width * character_in_line * size) + padding_x;
+                    float offset_y = -1 * (height - size);
                     Vector4 color = colors[i];
 
-                    //vert 1
-                    vertices[v_pos] = glyph_right_side;
-                    vertices[v_pos + 1] = glyph_top + line_base_offset;
+                    //vert 1 - top/right
+                    vertices[v_pos] = width;
+                    vertices[v_pos + 1] = padding_y + line_base_offset - offset_y;
                     vertices[v_pos + 2] = 0;
                     //uv
                     vertices[v_pos + 3] = glyph.uv_top_right.X;
-                    vertices[v_pos + 4] = glyph.uv_bottom_left.Y;
+                    vertices[v_pos + 4] = glyph.uv_top_right.Y;
                     //color
                     vertices[v_pos + 5] = color.X;
                     vertices[v_pos + 6] = color.Y;
                     vertices[v_pos + 7] = color.Z;
                     vertices[v_pos + 8] = color.W;
 
-                    //vert 2
-                    vertices[v_pos + 9] = glyph_right_side;
-                    vertices[v_pos + 10] = padding_y + line_base_offset;
+                    //vert 2 - bottom/right
+                    vertices[v_pos + 9] = width;
+                    vertices[v_pos + 10] = padding_y + line_base_offset - height - offset_y;
                     vertices[v_pos + 11] = 0;
                     //uv
                     vertices[v_pos + 12] = glyph.uv_top_right.X;
-                    vertices[v_pos + 13] = glyph.uv_top_right.Y;
+                    vertices[v_pos + 13] = glyph.uv_bottom_left.Y;
                     //color
                     vertices[v_pos + 14] = color.X;
                     vertices[v_pos + 15] = color.Y;
                     vertices[v_pos + 16] = color.Z;
                     vertices[v_pos + 17] = color.W;
 
-                    //vert 3
+                    //vert 3 - bottom/left
                     vertices[v_pos + 18] = padding_x;
-                    vertices[v_pos + 19] = padding_y + line_base_offset;
+                    vertices[v_pos + 19] = padding_y + line_base_offset - height - offset_y;
                     vertices[v_pos + 20] = 0;
                     //uv
                     vertices[v_pos + 21] = glyph.uv_bottom_left.X;
-                    vertices[v_pos + 22] = glyph.uv_top_right.Y;
+                    vertices[v_pos + 22] = glyph.uv_bottom_left.Y;
                     //color
                     vertices[v_pos + 23] = color.X;
                     vertices[v_pos + 24] = color.Y;
                     vertices[v_pos + 25] = color.Z;
                     vertices[v_pos + 26] = color.W;
 
-                    //vert 4
+                    //vert 4 - top/left
                     vertices[v_pos + 27] = padding_x;
-                    vertices[v_pos + 28] = glyph_top + line_base_offset;
+                    vertices[v_pos + 28] = padding_y + line_base_offset - offset_y;
                     vertices[v_pos + 29] = 0;
                     //uv
                     vertices[v_pos + 30] = glyph.uv_bottom_left.X;
-                    vertices[v_pos + 31] = glyph.uv_bottom_left.Y;
+                    vertices[v_pos + 31] = glyph.uv_top_right.Y;
                     //color
                     vertices[v_pos + 32] = color.X;
                     vertices[v_pos + 33] = color.Y;
                     vertices[v_pos + 34] = color.Z;
                     vertices[v_pos + 35] = color.W;
 
-                    padding_x = glyph_right_side + (font.pixel_size * character_in_line * size * font.d_pixel_between_characters);
+                    padding_x = width + (size * font.pixel_size * font.d_ratio_between_characters * character_in_line);
                 }
 
                 //inds
@@ -218,7 +236,8 @@ namespace R
 
                 int g = (int)text[i];
                 Ascii_Glyph glyph = font.glyphs[g];
-                text_width += (glyph.width + (font.d_pixel_between_characters * (i == text.Length - 1 ? 0 : font.pixel_size))) * character_in_line * size;
+                //text_width += (glyph.width + (font.d_ratio_between_characters * font.glyph_size_in_pixels * (i == text.Length - 1 ? 0 : font.pixel_size))) * character_in_line * size;
+                text_width += (glyph.width + (font.d_ratio_between_characters * (i == text.Length - 1 ? 0 : font.pixel_size))) * character_in_line * size;
             }
 
             if (max_width < text_width)
@@ -243,7 +262,7 @@ namespace R
                 }
             }
 
-            float single_line = (font.pixel_size * font.d_pixel_line_height) * size * character_in_line;
+            float single_line = (font.pixel_size * font.d_ratio_line_height * font.glyph_size_in_pixels) * size * character_in_line;
             float first_line = (font.pixel_size * font.glyph_size_in_pixels) * size * character_in_line;
             return first_line + (line_count * single_line);
         }
@@ -273,7 +292,7 @@ namespace R
                 }
             }
 
-            float single_line = (font.pixel_size * font.d_pixel_line_height) * size * character_in_line;
+            float single_line = (font.pixel_size * font.d_ratio_line_height * font.glyph_size_in_pixels) * size * character_in_line;
             float first_line = (font.pixel_size * font.glyph_size_in_pixels) * size * character_in_line;
             position.Y = (first_line + (line_number * single_line));
 
@@ -285,7 +304,7 @@ namespace R
                 int g = (int)text[line_first_char_idx + i];
                 Ascii_Glyph glyph = font.glyphs[g];
                 float glyph_size = glyph.width * character_in_line * size;
-                float padding = ((font.pixel_size * font.d_pixel_between_characters) * character_in_line * size);
+                float padding = ((font.pixel_size * font.d_ratio_between_characters * font.glyph_size_in_pixels) * character_in_line * size);
                 position.X += glyph_size + padding;
             }
 
@@ -294,7 +313,7 @@ namespace R
 
         public static float GetLineHeight(Ascii_Font font, float size)
         {
-            return font.pixel_size * font.d_pixel_line_height * size * character_in_line;
+            return font.pixel_size * font.d_ratio_line_height * font.glyph_size_in_pixels * size * character_in_line;
         }
 
         public static float GetGlyphSize(Ascii_Font font, float size)

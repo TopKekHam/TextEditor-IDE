@@ -35,10 +35,10 @@ namespace R
         0,2,3
     };
 
-        static uint color_shader;
-        static uint image_shader;
-        static uint tinted_image_shader;
-        static uint ascii_text_image_shader;
+        public static uint color_shader;
+        public static uint image_shader;
+        public static uint tinted_image_shader;
+        public static uint ascii_text_image_shader;
         static uint quad_vert_buffer;
         static uint quad_ind_buffer;
 
@@ -158,6 +158,7 @@ namespace R
             };
 
             DrawMesh(transform, mat, mesh);
+            DeleteMesh(mesh);
         }
 
         public static void DrawQuad(Transform transform, uint texture)
@@ -173,6 +174,7 @@ namespace R
             };
 
             DrawMesh(transform, mat, mesh);
+            DeleteMesh(mesh);
         }
 
         public static void DrawQuad(Transform transform, Vector2 size, Vector4 color)
@@ -189,7 +191,6 @@ namespace R
             Mesh mesh = MeshGenerator.GenerateQuad(size, VertexFormat.POSITION);
 
             DrawMesh(transform, mat, mesh);
-
             DeleteMesh(mesh);
         }
 
@@ -207,7 +208,6 @@ namespace R
             Mesh mesh = MeshGenerator.GenerateQuad(size, VertexFormat.POSITION | VertexFormat.TEX_COORD);
 
             DrawMesh(transform, mat, mesh);
-
             DeleteMesh(mesh);
         }
 
@@ -217,7 +217,6 @@ namespace R
             Mesh mesh = MeshGenerator.GenerateQuad(size, VertexFormat.POSITION | VertexFormat.TEX_COORD);
 
             DrawMesh(transform, mat, mesh);
-
             DeleteMesh(mesh);
         }
 
@@ -271,7 +270,6 @@ namespace R
             };
 
             DrawMesh(transform, mat, text_mesh);
-
             DeleteMesh(text_mesh);
         }
 

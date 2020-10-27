@@ -259,7 +259,7 @@ namespace R
             return buffer;
         }
 
-        public static uint BufferTexture(void* data, int width, int height, TextureType type, int texture_buffer = -1)
+        public static uint BufferTexture(void* data, int width, int height, TextureType type, int texture_buffer = -1, bool nearest = true)
         {
             uint buffer;
 
@@ -273,8 +273,15 @@ namespace R
                 buffer = (uint)texture_buffer;
             }
 
-            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MIN_FILTER, GL_Enum.NEAREST);
-            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MAG_FILTER, GL_Enum.NEAREST);
+            GL_Enum mode = GL_Enum.NEAREST;
+
+            if(!nearest)
+            {
+                mode = GL_Enum.LINEAR;
+            }
+
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MIN_FILTER, mode);
+            glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_MAG_FILTER, mode);
             glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_WRAP_S, GL_Enum.MIRRORED_REPEAT);
             glTexParameteri(GL_Enum.TEXTURE_2D, GL_Enum.TEXTURE_WRAP_T, GL_Enum.MIRRORED_REPEAT);
 

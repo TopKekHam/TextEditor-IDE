@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Transactions;
 
 namespace R
 {
@@ -12,6 +11,40 @@ namespace R
     public struct Vector2I
     {
         public int x, y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Selection
+    {
+        public Vector2I start, end;
+
+        public Selection(Vector2I v, Vector2I v2)
+        {
+            start = new Vector2I();
+            end = new Vector2I();
+
+            if (v.y != v2.y)
+            {
+                if (v.y < v2.y)
+                {
+                    start = v;
+                    end = v2;
+                }
+                else
+                {
+                    start = v2;
+                    end = v;
+                }
+            }
+            else
+            {
+                start.y = v.y;
+                end.y = v.y;
+
+                start.x = Math.Min(v.x, v2.x);
+                end.x = Math.Max(v.x, v2.x);
+            }
+        }
     }
 
     public enum TextBufferActionType : int
@@ -62,23 +95,20 @@ namespace R
         public TextBufferActionList actions = new TextBufferActionList();
         public Vector2I selection_ancor;
         public bool selection_active = false;
+        public bool single_line_mode = false;
 
-        public static TextBuffer Create()
+        public TextBuffer()
         {
-            TextBuffer buffer = new TextBuffer();
-
-            buffer.lines = new List<string>();
-            buffer.cursor = new Vector2I() { x = 0, y = 0 };
-
-            return buffer;
+            lines = new List<string>();
+            lines.Add("");
+            cursor = new Vector2I() { x = 0, y = 0 };
         }
 
-        public static TextBuffer Create(string src)
+        public TextBuffer(string src)
         {
-            TextBuffer buffer = new TextBuffer();
 
-            buffer.lines = new List<string>();
-            buffer.cursor = new Vector2I() { x = 0, y = 0 };
+            lines = new List<string>();
+            cursor = new Vector2I() { x = 0, y = 0 };
 
             int start = 0;
 
@@ -86,7 +116,7 @@ namespace R
             {
                 if (src[i] == '\r')
                 {
-                    buffer.lines.Add(src.Substring(start, i - start));
+                    lines.Add(src.Substring(start, i - start));
                     start = i + 1;
                 }
                 else if (src[i] == '\n')
@@ -95,17 +125,16 @@ namespace R
 
                     if (i - 1 > 0 && src[i - 1] != '\r')
                     {
-                        buffer.lines.Add(src.Substring(start, i - start));
+                        lines.Add(src.Substring(start, i - start));
                     }
                 }
             }
 
             if (start != src.Length)
             {
-                buffer.lines.Add(src.Substring(start, src.Length - start));
+                lines.Add(src.Substring(start, src.Length - start));
             }
 
-            return buffer;
         }
 
         public void InsertText(string str)
@@ -141,7 +170,6 @@ namespace R
 
         public void NextLine(bool add_indentation)
         {
-
             string inserted_string = "";
             int spaces = 0;
 
@@ -175,7 +203,7 @@ namespace R
                 selection_ancor = cursor;
             }
 
-            if(!selection_active && selection)
+            if (!selection_active && selection)
             {
                 selection_ancor = cursor;
             }
@@ -200,8 +228,15 @@ namespace R
 
                 if (cursor.x > width)
                 {
-                    cursor.y += 1;
-                    cursor.x -= width + 1;
+                    if (lines.Count > cursor.y + 1)
+                    {
+                        cursor.y += 1;
+                        cursor.x -= width + 1;
+                    }
+                    else
+                    {
+                        cursor.x -= move_vec.x;
+                    }
                 }
 
                 if (cursor.x < 0)
@@ -227,8 +262,15 @@ namespace R
         public TextBufferCharRemoveOperation RemoveChar()
         {
             TextBufferCharRemoveOperation operation = new TextBufferCharRemoveOperation();
+
             if (cursor.x == 0)
             {
+                if (single_line_mode)
+                {
+                    operation.type = TextBufferCharRemoveOperationType.NONE;
+                    return operation;
+                }
+
                 if (cursor.y > 0)
                 {
                     operation.type = TextBufferCharRemoveOperationType.LINE;
@@ -276,6 +318,7 @@ namespace R
                     break;
                 case TextBufferActionType.SwapLine:
                     {
+                        if (single_line_mode) return;
                         action.type = TextBufferActionType.SwapLine;
                         var swaped = SwapLine(action.swaped_line_diraction);
                         if (!swaped) return;
@@ -283,6 +326,7 @@ namespace R
                     break;
                 case TextBufferActionType.DuplicateLine:
                     {
+                        if (single_line_mode) return;
                         action.type = TextBufferActionType.DuplicateLine;
                         action.duplicated_line = cursor.y;
                         DuplicateLine(action.duplicated_line_diraction);
@@ -298,6 +342,7 @@ namespace R
                     break;
                 case TextBufferActionType.NextLine:
                     {
+                        if (single_line_mode) return;
                         action.type = TextBufferActionType.NextLine;
                         NextLine(true);
                         action.new_cursor_pos = cursor;
@@ -388,7 +433,7 @@ namespace R
             }
         }
 
-        public string ToString()
+        override public string ToString()
         {
             StringBuilder builder = new StringBuilder();
 
@@ -405,8 +450,52 @@ namespace R
             return builder.ToString();
         }
 
-    }
+        public void Clear()
+        {
+            cursor = new Vector2I() { x = 0, y = 0 };
+            lines = new List<string>();
+            lines.Add("");
+        }
 
+        public string ToStringSelection()
+        {
+            if (selection_ancor.x != cursor.x || selection_ancor.y != cursor.y)
+            {
+                Selection selection = new Selection(cursor, selection_ancor);
+
+                if (selection.start.y == selection.end.y) return lines[selection.start.y].Substring(selection.start.x, selection.end.x - selection.start.x);
+
+                StringBuilder builder = new StringBuilder();
+
+                for (int y = selection.start.y; y <= selection.end.y; y++)
+                {
+                    if (lines[y] == "")
+                    {
+                        builder.Append("");
+                    }
+                    else if (y == selection.start.y)
+                    {
+                        builder.Append(lines[y].Substring(selection.start.x));
+                        builder.Append('\n');
+                    }
+                    else if (y == selection.end.y)
+                    {
+                        builder.Append(lines[y].Substring(0, selection.end.x));
+                    }
+                    else
+                    {
+                        builder.Append(lines[y]);
+                        builder.Append('\n');
+                    }
+                }
+
+                return builder.ToString();
+            }
+
+            return "";
+        }
+
+    }
 
     public class TextBufferActionList
     {

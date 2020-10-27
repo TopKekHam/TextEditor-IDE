@@ -1,5 +1,10 @@
 ﻿namespace R
 {
+    public enum InputHoldKey
+    {
+        LEFT, RIGHT, UP, DOWN, REMOVE_CHAR, UNDO, REDO
+    }
+
     public struct InputHold
     {
         public float input_timer;
@@ -20,6 +25,9 @@
 
     public unsafe static class Input
     {
+
+        public static string this_frame_string_input;
+        public static bool got_user_input_this_frame = false;
 
         public static bool KeyDown(SDL_Scancode scancode)
         {
@@ -74,22 +82,6 @@
                 return false;
             }
         }
-
-        public static string this_frame_string_input;
-
-        public static string edited_text = null;
-        public static bool editing_text = false;
-        public static int cursor = 0; // index in edited_text.
-        public static float backspace_rejection_time = 0.2f;
-        public static float backspace_time_between = 0.025f;
-        public static bool auto_insert_next_line_at_end_of_the_line = true;
-        public static int tab_spaces = 4;
-        //public static int character_per_line = 16;
-
-        static bool start_rejecting_backspace = false;
-        static bool start_backspacing = false;
-        static float backspace_timer = 0;
-
 
         /** Old string input
          * public static void Old_TextEditing_Start(string str)
@@ -394,5 +386,181 @@
             cursor += str.Length;
         }
     **/
+    }
+
+    public unsafe static class TextBufferInput
+    {
+        public static void DoInput(TextBuffer buffer, InputHold[] holders, ref int remembered_x)
+        {
+            if (Input.KeyPressed(SDL_Scancode.KEY_LALT))
+            {
+                if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
+                {
+                    if (Input.KeyDown(SDL_Scancode.KEY_UP))
+                    {
+                        buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.DuplicateLine,
+                            duplicated_line_diraction = -1
+                        });
+                    }
+                    else if (Input.KeyDown(SDL_Scancode.KEY_DOWN))
+                    {
+                        buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.DuplicateLine,
+                            duplicated_line_diraction = 1
+                        });
+                    }
+                }
+                else
+                {
+                    if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref holders[(int)InputHoldKey.UP]))
+                    {
+                        buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.SwapLine,
+                            swaped_line_diraction = -1
+                        });
+                    }
+                    else if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref holders[(int)InputHoldKey.DOWN]))
+                    {
+                        buffer.ExecuteAction(new TextBufferAction()
+                        {
+                            type = TextBufferActionType.SwapLine,
+                            swaped_line_diraction = 1
+                        });
+                    }
+
+
+                }
+            }
+            else
+            {
+                bool selection_active = Input.KeyPressed(SDL_Scancode.KEY_LSHIFT);
+
+                var move_speed_modifier = 1;
+
+                if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
+                {
+                    move_speed_modifier = 4;
+
+                    if (Input.KeyDown(SDL_Scancode.KEY_C))
+                    {
+                        var res = buffer.ToStringSelection();
+                        System.Console.WriteLine(res);
+                        SDL.SetClipboardText(res);
+                    }
+                    else if (Input.KeyDown(SDL_Scancode.KEY_V))
+                    {
+                        if (SDL.HasClipboardText())
+                        {
+                            buffer.ExecuteAction(new TextBufferAction()
+                            {
+                                type = TextBufferActionType.InsertText,
+                                inserted_text = SDL.GetClipboardText()
+                            });
+                        }
+                    }
+
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_LEFT, ref holders[(int)InputHoldKey.LEFT], move_speed_modifier))
+                {
+                    buffer.MoveCursor(new Vector2I() { x = -1, y = 0 }, selection_active);
+                    remembered_x = buffer.cursor.x;
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_RIGHT, ref holders[(int)InputHoldKey.RIGHT], move_speed_modifier))
+                {
+                    buffer.MoveCursor(new Vector2I() { x = 1, y = 0 }, selection_active);
+                    remembered_x = buffer.cursor.x;
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_UP, ref holders[(int)InputHoldKey.UP], move_speed_modifier))
+                {
+                    buffer.MoveCursor(new Vector2I() { x = 0, y = -1 }, selection_active);
+                    PutCursorOnRememberedX(buffer, remembered_x);
+                }
+
+                if (Input.DoInputHolder(SDL_Scancode.KEY_DOWN, ref holders[(int)InputHoldKey.DOWN], move_speed_modifier))
+                {
+                    buffer.MoveCursor(new Vector2I() { x = 0, y = 1 }, selection_active);
+                    PutCursorOnRememberedX(buffer, remembered_x);
+                }
+            }
+
+            if (Input.KeyPressed(SDL_Scancode.KEY_LCTRL))
+            {
+                if (Input.DoInputHolder(SDL_Scancode.KEY_Z, ref holders[(int)InputHoldKey.UNDO]))
+                {
+                    buffer.UndoLastAction();
+                }
+                if (Input.DoInputHolder(SDL_Scancode.KEY_Y, ref holders[(int)InputHoldKey.REDO]))
+                {
+                    buffer.RedoLastAction();
+                }
+            }
+
+            if (Input.KeyDown(SDL_Scancode.KEY_RETURN))
+            {
+                buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.NextLine
+                });
+            }
+
+            if (Input.DoInputHolder(SDL_Scancode.KEY_BACKSPACE, ref holders[(int)InputHoldKey.REMOVE_CHAR]))
+            {
+                buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.RemoveChar
+                });
+            }
+
+            if (Input.KeyDown(SDL_Scancode.KEY_TAB))
+            {
+                buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.InsertText,
+                    inserted_text = "    "
+                });
+            }
+
+            if (Input.this_frame_string_input != null)
+            {
+                string filterd_string = Input.this_frame_string_input;
+
+                for (int i = 0; i < filterd_string.Length; i++)
+                {
+                    if (filterd_string[i] == '\n' || filterd_string[i] == '\r')
+                    {
+                        filterd_string = filterd_string.Remove(i, 1);
+                    }
+                }
+
+                buffer.ExecuteAction(new TextBufferAction()
+                {
+                    type = TextBufferActionType.InsertText,
+                    inserted_text = filterd_string
+                });
+            }
+
+        }
+
+        static void PutCursorOnRememberedX(TextBuffer buffer, int rememberd_x)
+        {
+            if (buffer.cursor.x < rememberd_x)
+            {
+                if (buffer.lines[buffer.cursor.y].Length >= rememberd_x)
+                {
+                    buffer.cursor.x = rememberd_x;
+                }
+                else
+                {
+                    buffer.cursor.x = buffer.lines[buffer.cursor.y].Length;
+                }
+            }
+        }
     }
 }
